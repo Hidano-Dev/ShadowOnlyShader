@@ -1,0 +1,98 @@
+using UnityEditor;
+using UnityEngine;
+
+namespace ShadowOnlyShader.Editor
+{
+    /// <summary>
+    /// ShadowOnlyManagerのカスタムInspector。
+    /// 仮想光源の追加・削除UIを提供する。
+    /// </summary>
+    [CustomEditor(typeof(ShadowOnlyManager))]
+    public class ShadowOnlyManagerEditor : UnityEditor.Editor
+    {
+        private SerializedProperty _blurQuality;
+        private SerializedProperty _blendMultiplier;
+        private SerializedProperty _floorRenderers;
+
+        private void OnEnable()
+        {
+            _blurQuality = serializedObject.FindProperty("_blurQuality");
+            _blendMultiplier = serializedObject.FindProperty("_blendMultiplier");
+            _floorRenderers = serializedObject.FindProperty("_floorRenderers");
+        }
+
+        public override void OnInspectorGUI()
+        {
+            serializedObject.Update();
+
+            var manager = (ShadowOnlyManager)target;
+
+            // グローバルパラメータ
+            EditorGUILayout.LabelField("グローバルパラメータ", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(_blurQuality);
+            EditorGUILayout.PropertyField(_blendMultiplier);
+
+            EditorGUILayout.Space(8);
+
+            // 仮想光源セクション
+            EditorGUILayout.LabelField("仮想光源", EditorStyles.boldLabel);
+
+            // 子VirtualLightの一覧表示
+            var virtualLights = manager.GetComponentsInChildren<VirtualLight>();
+            if (virtualLights.Length == 0)
+            {
+                EditorGUILayout.HelpBox("仮想光源がありません。下のボタンから追加してください。", MessageType.Info);
+            }
+            else
+            {
+                for (int i = 0; i < virtualLights.Length; i++)
+                {
+                    var vl = virtualLights[i];
+                    if (vl == null) continue;
+
+                    EditorGUILayout.BeginHorizontal();
+
+                    // クリックで選択できるオブジェクトフィールド
+                    EditorGUI.BeginDisabledGroup(true);
+                    EditorGUILayout.ObjectField(vl.gameObject, typeof(GameObject), true);
+                    EditorGUI.EndDisabledGroup();
+
+                    if (GUILayout.Button("選択", GUILayout.Width(40)))
+                    {
+                        Selection.activeGameObject = vl.gameObject;
+                    }
+
+                    if (GUILayout.Button("削除", GUILayout.Width(40)))
+                    {
+                        Undo.DestroyObjectImmediate(vl.gameObject);
+                        manager.RefreshVirtualLights();
+                        GUIUtility.ExitGUI();
+                    }
+
+                    EditorGUILayout.EndHorizontal();
+                }
+            }
+
+            EditorGUILayout.Space(4);
+
+            if (GUILayout.Button("仮想光源を追加"))
+            {
+                var go = new GameObject("VirtualLight");
+                Undo.RegisterCreatedObjectUndo(go, "Add VirtualLight");
+                go.transform.SetParent(manager.transform);
+                go.transform.localPosition = Vector3.zero;
+                go.transform.localRotation = Quaternion.Euler(50f, -30f, 0f);
+                go.AddComponent<VirtualLight>();
+                manager.RefreshVirtualLights();
+                Selection.activeGameObject = go;
+            }
+
+            EditorGUILayout.Space(8);
+
+            // 床面Renderer
+            EditorGUILayout.PropertyField(_floorRenderers, new GUIContent("床面Renderer"));
+
+            serializedObject.ApplyModifiedProperties();
+        }
+    }
+}
