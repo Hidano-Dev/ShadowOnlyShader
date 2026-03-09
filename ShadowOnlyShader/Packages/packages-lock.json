@@ -1,5 +1,13 @@
 {
   "dependencies": {
+    "com.hidano.shadow-only-shader": {
+      "version": "file:com.hidano.shadow-only-shader",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.render-pipelines.universal": "17.0.0"
+      }
+    },
     "com.unity.burst": {
       "version": "1.8.27",
       "depth": 2,
