@@ -2,7 +2,10 @@
     "name": "com.hidano.shadow-only-shader.Tests.Editor",
     "rootNamespace": "ShadowOnlyShader.Tests.Editor",
     "references": [
-        "com.hidano.shadow-only-shader"
+        "com.hidano.shadow-only-shader",
+        "com.hidano.shadow-only-shader.Editor",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
     ],
     "includePlatforms": [
         "Editor"

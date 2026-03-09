@@ -11,6 +11,7 @@
 
 - Runtime asmdefに`Unity.RenderPipelines.Core.Runtime`への参照を追加し、`RenderGraphModule`のコンパイルエラーを修正
 - package.jsonのdependenciesに`com.unity.render-pipelines.core`を追加
+- Tests/Editor asmdefにテスト用アセンブリ参照(`UnityEngine.TestRunner`、`UnityEditor.TestRunner`等)を追加
 
 ## [0.1.0] - 2026-03-09
 
