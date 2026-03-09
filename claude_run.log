@@ -111,3 +111,19 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 4 DepthOnlyシェーダーを実装する (exit: 0, 2026-03-09 20:11:07) ===
 === START 5.1 ScriptableRendererFeatureを実装する (2026-03-09 20:11:07) ===
+タスク5.1の実装が完了しました。
+
+### 実装内容
+
+- **`Runtime/ShadowOnlyRendererFeature.cs`** - `ScriptableRendererFeature`を継承し、`Create`でRenderPass生成、`AddRenderPasses`でシーン内のManagerを検索してPassに渡す処理を実装。Manager不在時は警告ログを出力しPassをスキップ。
+- **`Runtime/ShadowOnlyRenderPass.cs`** - `ScriptableRenderPass`のスケルトン実装（`RecordRenderGraph`の完全実装はTask 5.2で対応）
+- **`Tests~/Runtime/ShadowOnlyRendererFeatureTests.cs`** - 継承、Create、Dispose、RenderPassEvent、名前空間、Manager検索ロジックの検証テスト
+
+コミット済みです。次のタスクは **5.2**（RenderGraph UnsafePassで深度テクスチャ生成）です。
+
+[STDERR]
+
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+=== END 5.1 ScriptableRendererFeatureを実装する (exit: 0, 2026-03-09 20:14:20) ===
+=== START 5.2 RenderGraph UnsafePassで深度テクスチャ生成を実装する (2026-03-09 20:14:20) ===

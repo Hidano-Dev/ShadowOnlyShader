@@ -47,7 +47,7 @@
   - Managerが存在しない場合はPassをスキップし警告ログを出力する
   - _Requirements: 1.4, 6.1, 6.2_
 
-- [ ] 5.2 RenderGraph UnsafePassで深度テクスチャ生成を実装する
+- [x] 5.2 RenderGraph UnsafePassで深度テクスチャ生成を実装する
   - RecordRenderGraphメソッドでAddUnsafePassを使用し、UnsafeGraphContextからCommandBufferを取得する
   - 各VirtualLightごとに、深度RenderTextureへのSetRenderTarget、Clear、SetViewProjectionMatrices、DrawRendererループを実行する
   - 対象Rendererに一切の変更を加えず、CommandBuffer.DrawRendererで直接描画参照する
