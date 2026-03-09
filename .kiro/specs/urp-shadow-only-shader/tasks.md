@@ -41,7 +41,7 @@
   - _Requirements: 1.3, 5.1_
 
 - [ ] 5. ShadowOnlyRendererFeatureとRenderPassを実装する
-- [ ] 5.1 ScriptableRendererFeatureを実装する
+- [x] 5.1 ScriptableRendererFeatureを実装する
   - Createメソッドで ShadowOnlyRenderPass を生成する
   - AddRenderPassesメソッドでシーン内のShadowOnlyManagerを検索し、Passにデータを渡してレンダラーに登録する
   - Managerが存在しない場合はPassをスキップし警告ログを出力する

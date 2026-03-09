@@ -88,3 +88,26 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 3 ShadowOnlyManagerコンポーネントを実装する (exit: 0, 2026-03-09 20:09:54) ===
 === START 4 DepthOnlyシェーダーを実装する (2026-03-09 20:09:54) ===
+タスク4「DepthOnlyシェーダーを実装する」を完了しました。
+### 実装内容
+
+
+**`Runtime/Shaders/ShadowOnlyDepth.shader`** を新規作成:
+
+- **頂点シェーダー**: `TransformObjectToWorld` → `TransformWorldToHClip` で頂点変換。VP行列は `CommandBuffer.SetViewProjectionMatrices` で仮想光源のVP行列が設定済みのため、URP標準の変換関数がそのまま利用可能
+- **フラグメントシェーダー**: `return 0` — カラー出力なし（`ColorMask 0`で書き込み無効）
+- **シェーダー名**: `Hidden/ShadowOnly/DepthOnly` — CommandBuffer.DrawRenderer専用のためHiddenに配置
+### 次のタスク
+
+次は **タスク5** (ShadowOnlyRendererFeatureとRenderPassの実装) です:
+- `/kiro:spec-impl urp-shadow-only-shader 5`
+- **SkinnedMeshRenderer対応**: Unityが自動的にスキニングを適用するため、特別な対応は不要
+- **レンダーステート**: `ZWrite On`, `ZTest LEqual`, `ColorMask 0` — 深度書き込みのみ
+
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 4 DepthOnlyシェーダーを実装する (exit: 0, 2026-03-09 20:11:07) ===
+=== START 5.1 ScriptableRendererFeatureを実装する (2026-03-09 20:11:07) ===
