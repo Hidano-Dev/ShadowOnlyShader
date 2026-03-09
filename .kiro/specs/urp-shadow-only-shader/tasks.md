@@ -7,7 +7,7 @@
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
 - [ ] 2. VirtualLightコンポーネントを実装する
-- [ ] 2.1 (P) 仮想光源の投影パラメータとVP行列計算を実装する
+- [x] 2.1 (P) 仮想光源の投影パラメータとVP行列計算を実装する
   - Orthographic/Perspectiveの切り替えに応じたProjection行列の算出を行う
   - TransformからView行列を算出し、VP行列を毎フレーム更新する仕組みを構築する
   - 投影パラメータ（FOV、OrthographicSize、Near/Far）をInspectorに公開し、バリデーション（クランプ処理）を適用する
