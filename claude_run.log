@@ -214,3 +214,29 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 8 Gizmo描画を実装する (exit: 0, 2026-03-09 20:30:27) ===
 === START 9 サンプルシーンを作成する (2026-03-09 20:30:27) ===
+Task 9 完了。以下を作成しました:
+
+**サンプルシーン** (`Samples~/BasicSetup/Scenes/ShadowOnlySample.unity`):
+- Main Camera (pos: 0,2,-4, 20度下向き)
+- Directional Light (シーン照明用)
+- ShadowOnlySetup + ShadowOnlyManager (BlurQuality: Mid, BlendMultiplier: 1)
+  - VirtualLight_01 (Orthographic, size: 3, alpha: 0.6, blur: 2)
+- Floor (Quad 5x5, 床面としてManager登録済み)
+
+**URP Renderer設定** (`Samples~/BasicSetup/Settings/URP-ShadowOnlySample-Renderer.asset`):
+- ShadowOnlyRendererFeature登録済みのUniversalRendererData
+
+**.metaファイル** (16ファイル):
+- Runtime/Editor配下の全スクリプト・シェーダー・asmdefに固定GUIDを割り当て
+- シーンファイルからのスクリプト参照が正しく解決されるように
+
+**README** (`Samples~/BasicSetup/README.md`):
+- セットアップ手順の説明
+- Caster (Cube, pos: 0,0.5,0)
+
+[STDERR]
+
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+=== END 9 サンプルシーンを作成する (exit: 0, 2026-03-09 20:44:33) ===
+=== START 10 リソースライフサイクルとエラーハンドリングの検証を行う (2026-03-09 20:44:33) ===

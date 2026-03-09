@@ -93,7 +93,7 @@
   - Samples~フォルダに配置し、UPMのサンプルインポート機能で利用可能にする
   - _Requirements: 9.1, 9.2, 9.3_
 
-- [ ] 10. リソースライフサイクルとエラーハンドリングの検証を行う
+- [x] 10. リソースライフサイクルとエラーハンドリングの検証を行う
   - 自動生成リソース（Material、RenderTexture）がOnDestroy/OnDisableで確実に破棄されることを検証する
   - CasterRoot=null、FloorRenderer=null/非アクティブ、Manager不在などの設定エラー時にクラッシュせず適切な警告が出ることを検証する
   - Rendererが実行中に破棄された場合のnullチェック動作を検証する

@@ -255,56 +255,73 @@ namespace ShadowOnlyShader
         {
             if (_floorMaterial == null) return;
 
-            int lightCount = Mathf.Min(_virtualLights.Count, 8);
-
-            // アクティブな仮想光源数を設定
-            _floorMaterial.SetInt("_VirtualLightCount", lightCount);
-
             // グローバルパラメータの設定
             _floorMaterial.SetFloat("_BlendMultiplier", _blendMultiplier);
 
             // 各VirtualLightのパラメータを転送
-            for (int i = 0; i < lightCount; i++)
+            // 破棄済みVirtualLightの検出用フラグ
+            bool needsRefresh = false;
+            int validLightIndex = 0;
+
+            for (int i = 0; i < _virtualLights.Count && validLightIndex < 8; i++)
             {
                 var vl = _virtualLights[i];
-                if (vl == null) continue;
+
+                // 破棄済みまたはnullのVirtualLightはスキップ
+                if (vl == null)
+                {
+                    needsRefresh = true;
+                    continue;
+                }
 
                 // VP行列
-                _floorMaterial.SetMatrix(LightVPMatrixNames[i], vl.ViewProjectionMatrix);
+                _floorMaterial.SetMatrix(LightVPMatrixNames[validLightIndex], vl.ViewProjectionMatrix);
 
                 // 深度テクスチャ
-                if (vl.DepthRenderTexture != null)
+                var depthRT = vl.DepthRenderTexture;
+                if (depthRT != null)
                 {
-                    _floorMaterial.SetTexture(ShadowDepthTexNames[i], vl.DepthRenderTexture);
+                    _floorMaterial.SetTexture(ShadowDepthTexNames[validLightIndex], depthRT);
 
                     // テクスチャサイズ (width, height, 1/width, 1/height)
-                    float w = vl.DepthRenderTexture.width;
-                    float h = vl.DepthRenderTexture.height;
-                    _floorMaterial.SetVector(DepthTexSizeNames[i], new Vector4(w, h, 1f / w, 1f / h));
+                    float w = depthRT.width;
+                    float h = depthRT.height;
+                    _floorMaterial.SetVector(DepthTexSizeNames[validLightIndex], new Vector4(w, h, 1f / w, 1f / h));
                 }
 
                 // 影色
-                _floorMaterial.SetColor(ShadowColorNames[i], vl.ShadowColor);
+                _floorMaterial.SetColor(ShadowColorNames[validLightIndex], vl.ShadowColor);
 
                 // 影の濃さ
-                _floorMaterial.SetFloat(ShadowAlphaNames[i], vl.ShadowAlpha);
+                _floorMaterial.SetFloat(ShadowAlphaNames[validLightIndex], vl.ShadowAlpha);
 
                 // ブラー関連
-                _floorMaterial.SetFloat(BlurRadiusNames[i], vl.BlurRadius);
-                _floorMaterial.SetFloat(BlurDistanceFactorNames[i], vl.BlurDistanceFactor);
+                _floorMaterial.SetFloat(BlurRadiusNames[validLightIndex], vl.BlurRadius);
+                _floorMaterial.SetFloat(BlurDistanceFactorNames[validLightIndex], vl.BlurDistanceFactor);
 
                 // Hue Shift
-                _floorMaterial.SetFloat(HueShiftNames[i], vl.HueShift);
+                _floorMaterial.SetFloat(HueShiftNames[validLightIndex], vl.HueShift);
 
                 // 色収差
-                _floorMaterial.SetFloat(ChromaticAberrationNames[i], vl.ChromaticAberration);
+                _floorMaterial.SetFloat(ChromaticAberrationNames[validLightIndex], vl.ChromaticAberration);
 
                 // 深度バイアス
-                _floorMaterial.SetFloat(DepthBiasNames[i], vl.DepthBias);
+                _floorMaterial.SetFloat(DepthBiasNames[validLightIndex], vl.DepthBias);
 
                 // 光源ワールド位置（距離ボケ計算用）
                 Vector3 pos = vl.transform.position;
-                _floorMaterial.SetVector(LightWorldPosNames[i], new Vector4(pos.x, pos.y, pos.z, 1f));
+                _floorMaterial.SetVector(LightWorldPosNames[validLightIndex], new Vector4(pos.x, pos.y, pos.z, 1f));
+
+                validLightIndex++;
+            }
+
+            // 実際の有効な光源数を設定（破棄済みを除外した数）
+            _floorMaterial.SetInt("_VirtualLightCount", validLightIndex);
+
+            // 破棄済みVirtualLightが検出された場合、リストをリフレッシュ
+            if (needsRefresh)
+            {
+                RefreshVirtualLights();
             }
 
             // ブラー品質キーワードの切り替え
@@ -348,10 +365,21 @@ namespace ShadowOnlyShader
         {
             if (_floorMaterial == null) return;
 
-            for (int i = 0; i < _floorRenderers.Count; i++)
+            for (int i = _floorRenderers.Count - 1; i >= 0; i--)
             {
                 var renderer = _floorRenderers[i];
-                if (renderer == null) continue;
+
+                // 破棄済みまたはnullのRendererはスキップ（警告は初回のみ出力）
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                // 非アクティブなRendererはMaterial割り当てをスキップ
+                if (!renderer.gameObject.activeInHierarchy)
+                {
+                    continue;
+                }
 
                 renderer.sharedMaterial = _floorMaterial;
             }

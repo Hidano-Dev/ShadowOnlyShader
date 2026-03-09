@@ -362,6 +362,12 @@ namespace ShadowOnlyShader
             ReleaseDepthTexture();
         }
 
+        private void OnDestroy()
+        {
+            // OnDisableが呼ばれない場合の安全策として、OnDestroyでも破棄を行う
+            ReleaseDepthTexture();
+        }
+
         private void OnValidate()
         {
             // Apply clamping to serialized fields when modified in Inspector
