@@ -118,5 +118,11 @@ namespace ShadowOnlyShader
         /// View行列とProjection行列を現在のTransformとパラメータから再計算する。
         /// </summary>
         void UpdateMatrices();
+
+        /// <summary>
+        /// 深度RenderTextureの存在と解像度を確認し、必要に応じて作成・再作成する。
+        /// 解像度が変更された場合は古いRenderTextureを破棄して新しく作成する。
+        /// </summary>
+        void EnsureDepthTexture();
     }
 }

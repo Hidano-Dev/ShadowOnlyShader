@@ -18,7 +18,7 @@
   - 各パラメータをInspectorからリアルタイムに調整可能にする
   - _Requirements: 2.1, 2.2, 3.4, 7.2, 7.4, 7.5, 7.6_
 
-- [ ] 2.3 深度RenderTextureの管理とキャスターRenderer収集を実装する
+- [x] 2.3 深度RenderTextureの管理とキャスターRenderer収集を実装する
   - 仮想光源ごとの深度RenderTextureの作成・解像度変更時の再作成・OnDisableでの破棄を行う
   - CasterRootのGameObject指定により子階層の全Rendererを自動収集する機能を実装する
   - RenderTextureをHideFlags.DontSaveで管理し、テクスチャ解像度のクランプ（64-4096）を適用する

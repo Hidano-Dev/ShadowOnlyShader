@@ -250,6 +250,27 @@ namespace ShadowOnlyShader
             _viewProjectionMatrix = _projectionMatrix * _viewMatrix;
         }
 
+        /// <summary>
+        /// 深度RenderTextureの存在と解像度を確認し、必要に応じて作成・再作成する。
+        /// 解像度が変更された場合は古いRenderTextureを破棄して新しく作成する。
+        /// </summary>
+        public void EnsureDepthTexture()
+        {
+            int resolution = _textureResolution;
+
+            // 既存のRenderTextureが存在し、解像度が一致する場合はそのまま
+            if (_depthRenderTexture != null && _depthRenderTexture.width == resolution)
+            {
+                return;
+            }
+
+            // 古いRenderTextureが存在する場合は破棄
+            ReleaseDepthTexture();
+
+            // 新しいRenderTextureを作成
+            _depthRenderTexture = CreateDepthRenderTexture(resolution);
+        }
+
         #endregion
 
         #region Matrix Calculation
@@ -295,7 +316,51 @@ namespace ShadowOnlyShader
 
         #endregion
 
+        #region Depth RenderTexture Management
+
+        /// <summary>
+        /// 指定解像度で深度RenderTextureを作成する。
+        /// HideFlags.DontSaveを設定し、シーン保存時に永続化しない。
+        /// </summary>
+        private RenderTexture CreateDepthRenderTexture(int resolution)
+        {
+            var rt = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.Depth);
+            rt.hideFlags = HideFlags.DontSave;
+            rt.Create();
+            return rt;
+        }
+
+        /// <summary>
+        /// 深度RenderTextureを解放する。
+        /// </summary>
+        private void ReleaseDepthTexture()
+        {
+            if (_depthRenderTexture != null)
+            {
+                _depthRenderTexture.Release();
+                DestroyImmediate(_depthRenderTexture);
+                _depthRenderTexture = null;
+            }
+        }
+
+        #endregion
+
         #region MonoBehaviour Lifecycle
+
+        private void OnEnable()
+        {
+            // 深度RenderTextureの作成
+            EnsureDepthTexture();
+
+            // CasterRoot配下のRendererを自動収集
+            CollectRenderers();
+        }
+
+        private void OnDisable()
+        {
+            // 深度RenderTextureの破棄
+            ReleaseDepthTexture();
+        }
 
         private void OnValidate()
         {

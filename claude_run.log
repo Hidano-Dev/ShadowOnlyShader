@@ -36,3 +36,24 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 2.1 仮想光源の投影パラメータとVP行列計算を実装する (exit: 0, 2026-03-09 19:59:26) ===
 === START 2.2 影の外観パラメータを実装する (2026-03-09 19:59:26) ===
+タスク2.2が完了し、コミットされました。
+
+### 実行結果サマリ
+
+**タスク 2.2: 影の外観パラメータを実装する** - 完了
+
+**変更内容:**
+- `Tests~/Runtime/VirtualLightAppearanceTests.cs` - 46件のテスト新規作成（デフォルト値、バリデーション、インターフェースアクセス等）
+- `Runtime/VirtualLight.cs` - stubコメント削除、正式実装として整理
+- `.kiro/specs/urp-shadow-only-shader/tasks.md` - タスク2.2を完了マーク
+
+
+**次のステップ:** `/kiro:spec-impl urp-shadow-only-shader 2.3` で深度RenderTextureの管理とキャスターRenderer収集の実装へ進めます。
+**実装パラメータ:** ShadowColor, ShadowAlpha, BlurRadius, BlurDistanceFactor, HueShift, ChromaticAberration, DepthBias, NormalBias（全てSerializeField + バリデーション付き）
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 2.2 影の外観パラメータを実装する (exit: 0, 2026-03-09 20:02:47) ===
+=== START 2.3 深度RenderTextureの管理とキャスターRenderer収集を実装する (2026-03-09 20:02:47) ===
