@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. UPMパッケージの基盤構造を作成する
+- [x] 1. UPMパッケージの基盤構造を作成する
   - パッケージマニフェスト（package.json）を作成し、パッケージ名・バージョン・URP依存関係を定義する
   - Runtime用とEditor用のAssembly Definitionファイルを作成し、URPパッケージへの参照を設定する
   - 列挙型（ProjectionMode、BlurQuality）とインターフェース（IShadowOnlyManager、IVirtualLight）を定義する

@@ -1,0 +1,19 @@
+{
+    "name": "com.shadow-only-shader.Editor",
+    "rootNamespace": "ShadowOnlyShader.Editor",
+    "references": [
+        "com.shadow-only-shader",
+        "Unity.RenderPipelines.Universal.Runtime"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

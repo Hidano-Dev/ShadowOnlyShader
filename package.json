@@ -1,0 +1,28 @@
+{
+    "name": "com.shadow-only-shader",
+    "version": "0.1.0",
+    "displayName": "Shadow Only Shader",
+    "description": "URP向けの影だけを表示するシェーダーシステム。仮想光源からの深度テクスチャ生成とプロジェクティブテクスチャマッピングにより、透明な床面上にキャラクターの影のみを描画します。",
+    "unity": "6000.3",
+    "unityRelease": "0f1",
+    "dependencies": {
+        "com.unity.render-pipelines.universal": "17.0.0"
+    },
+    "keywords": [
+        "shadow",
+        "urp",
+        "shader",
+        "vtuber",
+        "render-pipeline"
+    ],
+    "author": {
+        "name": "ShadowOnlyShader"
+    },
+    "samples": [
+        {
+            "displayName": "Basic Setup",
+            "description": "基本的なセットアップを含むサンプルシーン。マネージャー・仮想光源・キャスター・床面が設定済みです。",
+            "path": "Samples~/BasicSetup"
+        }
+    ]
+}

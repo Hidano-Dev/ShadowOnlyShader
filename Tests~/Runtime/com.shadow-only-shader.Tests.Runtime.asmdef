@@ -1,0 +1,22 @@
+{
+    "name": "com.shadow-only-shader.Tests.Runtime",
+    "rootNamespace": "ShadowOnlyShader.Tests.Runtime",
+    "references": [
+        "com.shadow-only-shader",
+        "UnityEngine.TestRunner",
+        "UnityEditor.TestRunner"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
