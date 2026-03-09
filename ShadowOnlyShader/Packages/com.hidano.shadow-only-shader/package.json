@@ -1,12 +1,13 @@
 {
     "name": "com.hidano.shadow-only-shader",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "displayName": "Shadow Only Shader",
     "description": "URP向けの影だけを表示するシェーダーシステム。仮想光源からの深度テクスチャ生成とプロジェクティブテクスチャマッピングにより、透明な床面上にキャラクターの影のみを描画します。",
     "unity": "6000.3",
     "unityRelease": "0f1",
     "dependencies": {
-        "com.unity.render-pipelines.universal": "17.0.0"
+        "com.unity.render-pipelines.universal": "17.0.0",
+        "com.unity.render-pipelines.core": "17.0.0"
     },
     "keywords": [
         "shadow",
