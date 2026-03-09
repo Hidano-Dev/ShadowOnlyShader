@@ -274,8 +274,12 @@ namespace ShadowOnlyShader
                     continue;
                 }
 
-                // VP行列
-                _floorMaterial.SetMatrix(LightVPMatrixNames[validLightIndex], vl.ViewProjectionMatrix);
+                // VP行列（GPU変換済み）
+                // GL.GetGPUProjectionMatrixでプラットフォーム固有のProjection行列に変換し、
+                // 深度RenderPassと同じ変換を適用することで深度値の一致を保証する
+                var gpuProj = GL.GetGPUProjectionMatrix(vl.ProjectionMatrix, true);
+                var gpuVP = gpuProj * vl.ViewMatrix;
+                _floorMaterial.SetMatrix(LightVPMatrixNames[validLightIndex], gpuVP);
 
                 // 深度テクスチャ
                 var depthRT = vl.DepthRenderTexture;
