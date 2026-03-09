@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &-4286158868898498364
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7b8, type: 3}
+  m_Name: ShadowOnlyRendererFeature
+  m_EditorClassIdentifier:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: de640fe3d0e74d6e97f34ea11abc4808, type: 3}
+  m_Name: URP-ShadowOnlySample-Renderer
+  m_EditorClassIdentifier:
+  m_RendererFeatures:
+  - {fileID: -4286158868898498364}
+  m_RendererFeatureMap: 01000000
+  postProcessData: {fileID: 0}
+  xrSystemData: {fileID: 0}
+  shaders:
+    blitPS: {fileID: 0}
+    copyDepthPS: {fileID: 0}
+    screenSpaceShadowPS: {fileID: 0}
+    samplingPS: {fileID: 0}
+    stencilDeferredPS: {fileID: 0}
+    fallbackErrorPS: {fileID: 0}
+    materialErrorPS: {fileID: 0}
+    coreBlitPS: {fileID: 0}
+    coreBlitColorAndDepthPS: {fileID: 0}
+    cameraMotionVector: {fileID: 0}
+    objectMotionVector: {fileID: 0}
+  m_OpaqueLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_TransparentLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_DefaultStencilState:
+    enabled: 0
+    readMask: 255
+    writeMask: 255
+    reference: 0
+    compareFunctionFront: 8
+    passOperationFront: 0
+    failOperationFront: 0
+    zFailOperationFront: 0
+    compareFunctionBack: 8
+    passOperationBack: 0
+    failOperationBack: 0
+    zFailOperationBack: 0
+  m_ShadowTransparentReceive: 1
+  m_RenderingMode: 0
+  m_DepthPrimingMode: 0
+  m_CopyDepthMode: 0
+  m_AccurateGbufferNormals: 0
+  m_IntermediateTextureMode: 1

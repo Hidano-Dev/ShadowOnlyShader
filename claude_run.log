@@ -193,3 +193,24 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 7 ManagerからMaterialへのパラメータ転送を実装する (exit: 0, 2026-03-09 20:29:21) ===
 === START 8 Gizmo描画を実装する (2026-03-09 20:29:21) ===
+タスク8「Gizmo描画を実装する」が完了しました。
+
+### 実装内容
+
+**`Editor/VirtualLightGizmoDrawer.cs`** を新規作成:
+- `[DrawGizmo]` アトリビュートで VirtualLight コンポーネントにGizmo描画を登録
+- **Orthographic**: 矩形（Near/Far平面を接続する直方体のワイヤーフレーム）
+- Near/Farクリップ面の視覚化を含む
+- **Perspective**: 錐台（FOVに基づくフラスタムのワイヤーフレーム）
+- 選択時は明るい黄色（α=0.8）、非選択時は薄い黄色（α=0.3）で表示
+
+- **Requirement 8.3**: 仮想光源の方向・描画範囲をSceneビューでGizmo表示する
+- Editor asmdef内に配置済み
+### 要件カバレッジ
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 8 Gizmo描画を実装する (exit: 0, 2026-03-09 20:30:27) ===
+=== START 9 サンプルシーンを作成する (2026-03-09 20:30:27) ===
