@@ -158,3 +158,22 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 6.1 プロジェクティブテクスチャマッピングによる影判定の基本機能を実装する (exit: 0, 2026-03-09 20:21:20) ===
 === START 6.2 ブラー・Hue Shift・色収差の表現機能を実装する (2026-03-09 20:21:20) ===
+タスク6.2の実装とコミットが完了しました。
+**実装内容:**
+
+- **ガウシアンブラー**: `_BLUR_LOW`/`_BLUR_MID`/`_BLUR_HIGH` の3段階プリセット（multi_compileキーワード切替）
+- **距離ボケ**: 光源からの距離に応じたブラー半径の動的変化
+- **色収差**: RGBチャンネル分離による放射方向オフセット
+- **Hue Shift**: HSV色空間での色相回転処理
+- `Runtime/Shaders/ShadowOnlyFloor.shader` - エフェクト機能追加
+**変更ファイル:**
+
+- `Tests~/Runtime/ShadowOnlyFloorShaderEffectsTests.cs` - 28件のテスト新規作成
+- `.kiro/specs/urp-shadow-only-shader/tasks.md` - タスク6.2完了マーク
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 6.2 ブラー・Hue Shift・色収差の表現機能を実装する (exit: 0, 2026-03-09 20:25:41) ===
+=== START 7 ManagerからMaterialへのパラメータ転送を実装する (2026-03-09 20:25:41) ===

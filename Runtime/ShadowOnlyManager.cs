@@ -219,6 +219,146 @@ namespace ShadowOnlyShader
 
         #endregion
 
+        #region パラメータ転送
+
+        /// <summary>
+        /// シェーダーuniformプロパティ名のキャッシュ。
+        /// インデックス付きのプロパティ名を毎フレーム生成しないためのキャッシュ。
+        /// </summary>
+        private static readonly string[] LightVPMatrixNames = GenerateIndexedNames("_LightVPMatrix_", 8);
+        private static readonly string[] ShadowDepthTexNames = GenerateIndexedNames("_ShadowDepthTex_", 8);
+        private static readonly string[] ShadowColorNames = GenerateIndexedNames("_ShadowColor_", 8);
+        private static readonly string[] ShadowAlphaNames = GenerateIndexedNames("_ShadowAlpha_", 8);
+        private static readonly string[] BlurRadiusNames = GenerateIndexedNames("_BlurRadius_", 8);
+        private static readonly string[] BlurDistanceFactorNames = GenerateIndexedNames("_BlurDistanceFactor_", 8);
+        private static readonly string[] HueShiftNames = GenerateIndexedNames("_HueShift_", 8);
+        private static readonly string[] ChromaticAberrationNames = GenerateIndexedNames("_ChromaticAberration_", 8);
+        private static readonly string[] DepthBiasNames = GenerateIndexedNames("_DepthBias_", 8);
+        private static readonly string[] LightWorldPosNames = GenerateIndexedNames("_LightWorldPos_", 8);
+        private static readonly string[] DepthTexSizeNames = GenerateIndexedNames("_DepthTexSize_", 8);
+
+        private static string[] GenerateIndexedNames(string prefix, int count)
+        {
+            var names = new string[count];
+            for (int i = 0; i < count; i++)
+            {
+                names[i] = prefix + i;
+            }
+            return names;
+        }
+
+        /// <summary>
+        /// 各VirtualLightのパラメータを床面MaterialのuniformにMaterial.SetXxxで設定する。
+        /// 毎フレームLateUpdateから呼び出され、パラメータ変更がリアルタイムに反映される。
+        /// </summary>
+        public void UpdateMaterialProperties()
+        {
+            if (_floorMaterial == null) return;
+
+            int lightCount = Mathf.Min(_virtualLights.Count, 8);
+
+            // アクティブな仮想光源数を設定
+            _floorMaterial.SetInt("_VirtualLightCount", lightCount);
+
+            // グローバルパラメータの設定
+            _floorMaterial.SetFloat("_BlendMultiplier", _blendMultiplier);
+
+            // 各VirtualLightのパラメータを転送
+            for (int i = 0; i < lightCount; i++)
+            {
+                var vl = _virtualLights[i];
+                if (vl == null) continue;
+
+                // VP行列
+                _floorMaterial.SetMatrix(LightVPMatrixNames[i], vl.ViewProjectionMatrix);
+
+                // 深度テクスチャ
+                if (vl.DepthRenderTexture != null)
+                {
+                    _floorMaterial.SetTexture(ShadowDepthTexNames[i], vl.DepthRenderTexture);
+
+                    // テクスチャサイズ (width, height, 1/width, 1/height)
+                    float w = vl.DepthRenderTexture.width;
+                    float h = vl.DepthRenderTexture.height;
+                    _floorMaterial.SetVector(DepthTexSizeNames[i], new Vector4(w, h, 1f / w, 1f / h));
+                }
+
+                // 影色
+                _floorMaterial.SetColor(ShadowColorNames[i], vl.ShadowColor);
+
+                // 影の濃さ
+                _floorMaterial.SetFloat(ShadowAlphaNames[i], vl.ShadowAlpha);
+
+                // ブラー関連
+                _floorMaterial.SetFloat(BlurRadiusNames[i], vl.BlurRadius);
+                _floorMaterial.SetFloat(BlurDistanceFactorNames[i], vl.BlurDistanceFactor);
+
+                // Hue Shift
+                _floorMaterial.SetFloat(HueShiftNames[i], vl.HueShift);
+
+                // 色収差
+                _floorMaterial.SetFloat(ChromaticAberrationNames[i], vl.ChromaticAberration);
+
+                // 深度バイアス
+                _floorMaterial.SetFloat(DepthBiasNames[i], vl.DepthBias);
+
+                // 光源ワールド位置（距離ボケ計算用）
+                Vector3 pos = vl.transform.position;
+                _floorMaterial.SetVector(LightWorldPosNames[i], new Vector4(pos.x, pos.y, pos.z, 1f));
+            }
+
+            // ブラー品質キーワードの切り替え
+            UpdateBlurQualityKeywords();
+        }
+
+        /// <summary>
+        /// ブラー品質プリセットに応じたシェーダーキーワードを切り替える。
+        /// Material.EnableKeyword / DisableKeyword で _BLUR_LOW / _BLUR_MID / _BLUR_HIGH を制御する。
+        /// </summary>
+        private void UpdateBlurQualityKeywords()
+        {
+            if (_floorMaterial == null) return;
+
+            // まず全てのブラーキーワードを無効にする
+            _floorMaterial.DisableKeyword("_BLUR_LOW");
+            _floorMaterial.DisableKeyword("_BLUR_MID");
+            _floorMaterial.DisableKeyword("_BLUR_HIGH");
+
+            // 選択された品質に対応するキーワードを有効にする
+            switch (_blurQuality)
+            {
+                case BlurQuality.Low:
+                    _floorMaterial.EnableKeyword("_BLUR_LOW");
+                    break;
+                case BlurQuality.Mid:
+                    _floorMaterial.EnableKeyword("_BLUR_MID");
+                    break;
+                case BlurQuality.High:
+                    _floorMaterial.EnableKeyword("_BLUR_HIGH");
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// 床面RendererにFloorMaterialを自動割り当てする。
+        /// 登録済みの各FloorRendererのsharedMaterialをFloorMaterialに設定する。
+        /// nullまたは破棄済みのRendererはスキップする。
+        /// </summary>
+        public void AssignFloorMaterial()
+        {
+            if (_floorMaterial == null) return;
+
+            for (int i = 0; i < _floorRenderers.Count; i++)
+            {
+                var renderer = _floorRenderers[i];
+                if (renderer == null) continue;
+
+                renderer.sharedMaterial = _floorMaterial;
+            }
+        }
+
+        #endregion
+
         #region 複数Manager警告
 
         /// <summary>
@@ -269,6 +409,15 @@ namespace ShadowOnlyShader
         {
             // シリアライズフィールドのバリデーション
             _blendMultiplier = Mathf.Max(_blendMultiplier, 0f);
+        }
+
+        private void LateUpdate()
+        {
+            // 毎フレーム、各VirtualLightのパラメータをMaterialに転送する
+            UpdateMaterialProperties();
+
+            // 床面RendererにMaterialを割り当てる
+            AssignFloorMaterial();
         }
 
         private void OnTransformChildrenChanged()

@@ -72,7 +72,7 @@
   - RGBチャンネル分離による色収差（影の中心からの放射方向オフセット）を実装する
   - _Requirements: 7.2, 7.3, 7.4, 7.5, 7.6_
 
-- [ ] 7. ManagerからMaterialへのパラメータ転送を実装する
+- [x] 7. ManagerからMaterialへのパラメータ転送を実装する
   - ShadowOnlyManagerが毎フレーム各VirtualLightのパラメータ（VP行列、深度テクスチャ、影色、濃さ、ブラー関連、Hue Shift、色収差、深度バイアス）を床面MaterialのuniformにMaterial.SetXxxで設定する
   - アクティブな仮想光源数を_VirtualLightCountとして設定する
   - ブラー品質キーワードをMaterial.EnableKeywordで切り替える
