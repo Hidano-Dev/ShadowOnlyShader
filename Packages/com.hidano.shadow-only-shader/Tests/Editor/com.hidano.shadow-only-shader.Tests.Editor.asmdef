@@ -1,13 +1,12 @@
 {
-    "name": "com.shadow-only-shader.Tests.Runtime",
-    "rootNamespace": "ShadowOnlyShader.Tests.Runtime",
+    "name": "com.hidano.shadow-only-shader.Tests.Editor",
+    "rootNamespace": "ShadowOnlyShader.Tests.Editor",
     "references": [
-        "com.shadow-only-shader",
-        "UnityEngine.TestRunner",
-        "UnityEditor.TestRunner",
-        "Unity.RenderPipelines.Universal.Runtime"
+        "com.hidano.shadow-only-shader"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": true,

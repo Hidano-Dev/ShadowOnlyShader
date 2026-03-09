@@ -1,10 +1,13 @@
 {
-    "name": "com.shadow-only-shader",
-    "rootNamespace": "ShadowOnlyShader",
+    "name": "com.hidano.shadow-only-shader.Editor",
+    "rootNamespace": "ShadowOnlyShader.Editor",
     "references": [
+        "com.hidano.shadow-only-shader",
         "Unity.RenderPipelines.Universal.Runtime"
     ],
-    "includePlatforms": [],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
