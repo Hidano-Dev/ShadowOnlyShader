@@ -141,3 +141,20 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 5.2 RenderGraph UnsafePassで深度テクスチャ生成を実装する (exit: 0, 2026-03-09 20:18:17) ===
 === START 6.1 プロジェクティブテクスチャマッピングによる影判定の基本機能を実装する (2026-03-09 20:18:17) ===
+タスク6.1の実装とコミットが完了しました。
+
+- `Runtime/Shaders/ShadowOnlyFloor.shader` を新規作成
+- プロジェクティブテクスチャマッピングによる影判定（VP行列変換→深度比較→影領域判定）
+**実装サマリー:**
+- 最大8光源の影を加算合成、`_BlendMultiplier`で調整
+- 射影範囲外・カメラ背面のクランプ処理
+- `Blend SrcAlpha OneMinusSrcAlpha`, `ZWrite Off` で影以外を透明に
+- `UNITY_REVERSED_Z` 両プラットフォーム対応
+- タスク6.2用のブラー/HueShift/色収差のuniform変数・multi_compileキーワードも準備済み
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 6.1 プロジェクティブテクスチャマッピングによる影判定の基本機能を実装する (exit: 0, 2026-03-09 20:21:20) ===
+=== START 6.2 ブラー・Hue Shift・色収差の表現機能を実装する (2026-03-09 20:21:20) ===
