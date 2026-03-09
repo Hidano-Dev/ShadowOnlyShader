@@ -34,6 +34,12 @@ namespace ShadowOnlyShader
             /// <summary>深度描画に使用するDepthOnly Material。</summary>
             public Material depthOnlyMaterial;
 
+            /// <summary>元のカメラView行列（描画後に復元する）。</summary>
+            public Matrix4x4 cameraViewMatrix;
+
+            /// <summary>元のカメラProjection行列（描画後に復元する）。</summary>
+            public Matrix4x4 cameraProjectionMatrix;
+
             /// <summary>
             /// PassDataの内容をクリアする。
             /// 毎フレームの再利用のために使用する。
@@ -97,12 +103,18 @@ namespace ShadowOnlyShader
                 return;
             }
 
+            // カメラのView/Projection行列を取得（描画後に復元するため）
+            var cameraData = frameData.Get<UniversalCameraData>();
+            var camera = cameraData.camera;
+
             using (var builder = renderGraph.AddUnsafePass<PassData>(
                 "ShadowOnly Depth Pass", out var passData))
             {
                 // PassDataをセットアップ
                 passData.Clear();
                 passData.depthOnlyMaterial = _depthOnlyMaterial;
+                passData.cameraViewMatrix = camera.worldToCameraMatrix;
+                passData.cameraProjectionMatrix = camera.projectionMatrix;
 
                 bool hasValidLight = false;
 
@@ -223,6 +235,9 @@ namespace ShadowOnlyShader
                     }
                 }
             }
+
+            // 元のカメラView/Projection行列を復元する
+            cmd.SetViewProjectionMatrices(data.cameraViewMatrix, data.cameraProjectionMatrix);
         }
     }
 }
