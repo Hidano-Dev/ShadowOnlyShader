@@ -34,7 +34,7 @@
   - 複数Manager存在時の警告処理を含める
   - _Requirements: 3.2, 3.7, 4.1, 4.2, 4.3, 4.4, 4.5, 8.1, 8.4_
 
-- [ ] 4. DepthOnlyシェーダーを実装する
+- [x] 4. DepthOnlyシェーダーを実装する
   - 仮想光源のVP行列で頂点変換を行い、深度値のみを出力するHLSLシェーダーを作成する
   - ZWrite On、ZTest LEqual、ColorMask 0 の設定で、カラー出力なしの深度書き込みのみを行う
   - SkinnedMeshRendererのボーン変換に対応する（Unityの自動スキニングを利用）

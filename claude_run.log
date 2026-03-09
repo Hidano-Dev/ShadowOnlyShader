@@ -68,3 +68,23 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 2.3 深度RenderTextureの管理とキャスターRenderer収集を実装する (exit: 0, 2026-03-09 20:05:56) ===
 === START 3 ShadowOnlyManagerコンポーネントを実装する (2026-03-09 20:05:57) ===
+タスク3の実装とコミットが完了しました。
+
+**実装内容:**
+  - 子GameObjectのVirtualLight自動検出・動的更新
+- `Runtime/ShadowOnlyManager.cs` — IShadowOnlyManagerインターフェースの完全実装
+  - 床面Rendererリスト管理（追加・削除・重複防止・nullガード）
+  - FloorMaterialの自動生成とライフサイクル管理（HideFlags.DontSave）
+  - BlurQuality / BlendMultiplier のグローバルパラメータ
+  - Public API: AddVirtualLight, RemoveVirtualLight, AddFloorRenderer, RemoveFloorRenderer
+  - 複数Manager存在時の警告ログ出力
+
+- `Tests~/Runtime/ShadowOnlyManagerTests.cs` — 35テスト（TDD）
+**次のステップ:** `/kiro:spec-impl urp-shadow-only-shader 4` でDepthOnlyシェーダーの実装へ進めます。
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 3 ShadowOnlyManagerコンポーネントを実装する (exit: 0, 2026-03-09 20:09:54) ===
+=== START 4 DepthOnlyシェーダーを実装する (2026-03-09 20:09:54) ===
