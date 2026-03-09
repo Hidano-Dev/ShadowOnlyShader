@@ -127,3 +127,17 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 5.1 ScriptableRendererFeatureを実装する (exit: 0, 2026-03-09 20:14:20) ===
 === START 5.2 RenderGraph UnsafePassで深度テクスチャ生成を実装する (2026-03-09 20:14:20) ===
+コミット完了しました: `610d2b8 5.2 RenderGraph UnsafePassで深度テクスチャ生成を実装する`
+
+- `Runtime/ShadowOnlyRenderPass.cs` — RecordRenderGraph実装
+**変更ファイル (4件):**
+- `Tests~/Runtime/ShadowOnlyRenderPassTests.cs` — 新規テスト23件
+- `.kiro/specs/urp-shadow-only-shader/tasks.md` — タスク5.2を完了マーク
+- `claude_run.log`
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 5.2 RenderGraph UnsafePassで深度テクスチャ生成を実装する (exit: 0, 2026-03-09 20:18:17) ===
+=== START 6.1 プロジェクティブテクスチャマッピングによる影判定の基本機能を実装する (2026-03-09 20:18:17) ===
