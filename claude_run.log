@@ -57,3 +57,14 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 2.2 影の外観パラメータを実装する (exit: 0, 2026-03-09 20:02:47) ===
 === START 2.3 深度RenderTextureの管理とキャスターRenderer収集を実装する (2026-03-09 20:02:47) ===
+コミット完了しました (`5ebc9b3`)。
+
+**次のステップ**: タスク3（ShadowOnlyManagerコンポーネント）が次の未完了タスクです。
+- `/kiro:spec-impl urp-shadow-only-shader 3` で実行できます。
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 2.3 深度RenderTextureの管理とキャスターRenderer収集を実装する (exit: 0, 2026-03-09 20:05:56) ===
+=== START 3 ShadowOnlyManagerコンポーネントを実装する (2026-03-09 20:05:57) ===

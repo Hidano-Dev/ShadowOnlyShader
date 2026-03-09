@@ -25,7 +25,7 @@
   - 2.1のVP行列と2.2のパラメータが定義済みである前提で、RenderTextureとRenderer収集のライフサイクルを構築する
   - _Requirements: 3.6, 5.2, 5.5_
 
-- [ ] 3. ShadowOnlyManagerコンポーネントを実装する
+- [x] 3. ShadowOnlyManagerコンポーネントを実装する
   - 子GameObjectのVirtualLightコンポーネントを自動検出・動的更新する仕組みを構築する
   - 床面Rendererリストの管理（登録・削除）機能を実装する
   - Material/RenderTexture等の自動生成リソースのライフサイクル管理（OnEnable生成、OnDestroy破棄）を実装する
