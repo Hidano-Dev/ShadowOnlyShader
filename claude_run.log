@@ -177,3 +177,19 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 6.2 ブラー・Hue Shift・色収差の表現機能を実装する (exit: 0, 2026-03-09 20:25:41) ===
 === START 7 ManagerからMaterialへのパラメータ転送を実装する (2026-03-09 20:25:41) ===
+タスク7の実装が完了しました。
+
+### 実施内容
+
+- **テスト**: `Tests~/Runtime/MaterialParameterTransferTests.cs` に27テストケースを作成（VP行列・影色・濃さ・ブラー関連・Hue Shift・色収差・深度バイアス等の各パラメータ転送、ブラー品質キーワード切り替え、床面Material自動割り当て、null安全性を検証）
+- **実装**: `Runtime/ShadowOnlyManager.cs` に `UpdateMaterialProperties()`、`AssignFloorMaterial()`、`UpdateBlurQualityKeywords()` を追加し、`LateUpdate()` で毎フレーム自動呼び出し
+- **最適化**: プロパティ名のstatic配列キャッシュで毎フレームの文字列生成を回避
+- **コミット済み**: "7. ManagerからMaterialへのパラメータ転送を実装する"
+- **tasks.md**: タスク7を完了としてマーク済み
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 7 ManagerからMaterialへのパラメータ転送を実装する (exit: 0, 2026-03-09 20:29:21) ===
+=== START 8 Gizmo描画を実装する (2026-03-09 20:29:21) ===

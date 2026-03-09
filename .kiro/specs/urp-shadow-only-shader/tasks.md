@@ -80,7 +80,7 @@
   - パラメータ変更がリアルタイムに影の描画に反映されることを確認する
   - _Requirements: 2.3, 2.4, 3.4, 3.7, 4.1, 4.5, 7.6_
 
-- [ ] 8. Gizmo描画を実装する
+- [x] 8. Gizmo描画を実装する
   - VirtualLightの方向・描画範囲をSceneビューでGizmoとして表示する
   - Orthographicの場合は矩形（Gizmos.DrawWireCube）、Perspectiveの場合は錐台（Gizmos.DrawFrustum）を描画する
   - Near/Farクリップ面の視覚化を含める
