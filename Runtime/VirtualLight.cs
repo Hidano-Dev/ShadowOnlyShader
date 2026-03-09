@@ -34,7 +34,7 @@ namespace ShadowOnlyShader
 
         #endregion
 
-        #region Serialized Fields - Shadow Appearance (stub for task 2.2)
+        #region Serialized Fields - Shadow Appearance
 
         [Header("Shadow Appearance")]
         [SerializeField]
