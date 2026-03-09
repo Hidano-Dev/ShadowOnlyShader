@@ -483,6 +483,12 @@ Shader "Hidden/ShadowOnlyShader/Floor"
 
                 float bias = GetDepthBias(lightIndex);
 
+                // Perspective投影では深度が非線形（depth ≈ near/d）のため、
+                // NDC空間での深度差がw²に反比例して縮小する。
+                // バイアスを1/w²でスケーリングすることで、投影モードに依存しない
+                // 一貫した深度比較を実現する。Orthographic（w=1）では影響なし。
+                bias /= (positionLS.w * positionLS.w);
+
                 // ブラーなし（キーワード未設定時）: 単一サンプル
                 #if BLUR_KERNEL_RADIUS == 0
                     return ComputeShadowAtUV(lightIndex, shadowUV, fragmentDepth, bias);
