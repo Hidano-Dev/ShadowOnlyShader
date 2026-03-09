@@ -240,3 +240,20 @@ SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/ho
 
 === END 9 サンプルシーンを作成する (exit: 0, 2026-03-09 20:44:33) ===
 === START 10 リソースライフサイクルとエラーハンドリングの検証を行う (2026-03-09 20:44:33) ===
+タスク10が完了し、コミットしました。
+
+### 変更内容まとめ
+
+| ファイル | 変更 |
+| `Tests~/Runtime/ResourceLifecycleAndErrorHandlingTests.cs` | 新規作成 - 27件のテスト（リソース破棄、nullチェック、エラーハンドリング） |
+|---|---|
+| `Runtime/VirtualLight.cs` | `OnDestroy`メソッド追加（RenderTextureの確実な破棄） |
+| `Runtime/ShadowOnlyManager.cs` | 破棄済みVirtualLightのスキップ処理、非アクティブRendererのスキップ処理を追加 |
+| `.kiro/specs/urp-shadow-only-shader/tasks.md` | タスク10を完了マーク |
+
+[STDERR]
+SessionEnd hook [powershell -NoProfile -ExecutionPolicy Bypass -File ".claude/hooks/cleanup-test-results.ps1"] failed: -File �p�����[�^�[�̈��� '.claude/hooks/cleanup-test-results.ps1' �͑��݂��܂���B������ '.ps1' �t�@�C���̃p�X�� -File �p�����[�^�[�̈����Ƃ��Ďw�肵�Ă��������B
+
+
+=== END 10 リソースライフサイクルとエラーハンドリングの検証を行う (exit: 0, 2026-03-09 20:48:39) ===
+=== START 11 受け入れ基準に基づくテストカバレッジを追加する (2026-03-09 20:48:39) ===
