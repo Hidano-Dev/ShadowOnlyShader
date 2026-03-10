@@ -563,9 +563,9 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                     float totalShadow = 0.0;
                     float sigma = max((float)BLUR_KERNEL_RADIUS / 3.0, 0.5);
 
-                    for (int y = -BLUR_KERNEL_RADIUS; y <= BLUR_KERNEL_RADIUS; y++)
+                    [loop] for (int y = -BLUR_KERNEL_RADIUS; y <= BLUR_KERNEL_RADIUS; y++)
                     {
-                        for (int x = -BLUR_KERNEL_RADIUS; x <= BLUR_KERNEL_RADIUS; x++)
+                        [loop] for (int x = -BLUR_KERNEL_RADIUS; x <= BLUR_KERNEL_RADIUS; x++)
                         {
                             float2 offset = float2((float)x, (float)y) * texelSize * blurRadius;
                             float2 sampleUV = shadowUV + offset;
@@ -650,7 +650,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
 
                 float invLastIndex = 1.0 / (float)(CA_SAMPLES - 1);
 
-                for (int s = 0; s < CA_SAMPLES; s++)
+                [loop] for (int s = 0; s < CA_SAMPLES; s++)
                 {
                     float t = (float)s * invLastIndex; // 0.0 → 1.0
                     float offsetScale = t * 2.0 - 1.0; // -1.0 → +1.0
@@ -696,7 +696,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 // 光源数の上限をクランプ
                 int lightCount = min(_VirtualLightCount, MAX_VIRTUAL_LIGHTS);
 
-                for (int i = 0; i < lightCount; i++)
+                [loop] for (int i = 0; i < lightCount; i++)
                 {
                     // 色収差の有無で影サンプリング方法を切り替え
                     float chromaticAberration = GetChromaticAberration(i);
