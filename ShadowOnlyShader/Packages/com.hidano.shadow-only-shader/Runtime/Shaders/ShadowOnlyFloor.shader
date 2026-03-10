@@ -159,6 +159,18 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             float _ChromaticAberration_6;
             float _ChromaticAberration_7;
 
+            // 色収差の光源色（スペクトル重み変調用）
+            // 光源の色に応じてRGB各波長帯の寄与率を変化させる
+            // 白(1,1,1)=標準CA、単色光=CAなし（物理的に正しい挙動）
+            float4 _ChromaticAberrationColor_0;
+            float4 _ChromaticAberrationColor_1;
+            float4 _ChromaticAberrationColor_2;
+            float4 _ChromaticAberrationColor_3;
+            float4 _ChromaticAberrationColor_4;
+            float4 _ChromaticAberrationColor_5;
+            float4 _ChromaticAberrationColor_6;
+            float4 _ChromaticAberrationColor_7;
+
             // 各仮想光源のワールド位置（距離ボケ計算用）
             float4 _LightWorldPos_0;
             float4 _LightWorldPos_1;
@@ -300,6 +312,18 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 if (index == 5) return _ChromaticAberration_5;
                 if (index == 6) return _ChromaticAberration_6;
                 return _ChromaticAberration_7;
+            }
+
+            float4 GetChromaticAberrationColor(int index)
+            {
+                if (index == 0) return _ChromaticAberrationColor_0;
+                if (index == 1) return _ChromaticAberrationColor_1;
+                if (index == 2) return _ChromaticAberrationColor_2;
+                if (index == 3) return _ChromaticAberrationColor_3;
+                if (index == 4) return _ChromaticAberrationColor_4;
+                if (index == 5) return _ChromaticAberrationColor_5;
+                if (index == 6) return _ChromaticAberrationColor_6;
+                return _ChromaticAberrationColor_7;
             }
 
             float4 GetLightWorldPos(int index)
@@ -446,7 +470,9 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             // 距離ボケにも対応（光源からの距離に応じたブラー半径の動的変化）
             // ===================================================================
 
-            float ComputeShadow(int lightIndex, float3 positionWS)
+            // 影判定の内部実装: uvOffset を加算して影をサンプリングする
+            // uvOffset = (0,0) のとき通常の影判定と同じ
+            float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
             {
                 // ワールド位置をライト射影空間に変換
                 float4x4 lightVP = GetLightVPMatrix(lightIndex);
@@ -474,6 +500,16 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 #if UNITY_UV_STARTS_AT_TOP
                     shadowUV.y = 1.0 - shadowUV.y;
                 #endif
+
+                // 色収差用UVオフセットを適用
+                shadowUV += uvOffset;
+
+                // オフセット後のUV範囲外チェック
+                if (shadowUV.x < 0.0 || shadowUV.x > 1.0 ||
+                    shadowUV.y < 0.0 || shadowUV.y > 1.0)
+                {
+                    return 0.0;
+                }
 
                 // フラグメントの深度値
                 float fragmentDepth = ndc.z;
@@ -553,42 +589,93 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 #endif
             }
 
-            // ===================================================================
-            // 色収差: RGBチャンネル分離
-            // 影の中心からの放射方向にRGBチャンネルをオフセットする
-            // ===================================================================
-
-            // 色収差を適用した影色を計算する
-            // shadowUVCenter: 影のUV中心（0.5, 0.5 = テクスチャ中心）
-            // fragmentUV: フラグメントのUV座標
-            // baseColor: ベース影色
-            // aberrationStrength: 色収差強度
-            float3 ApplyChromaticAberration(float3 baseColor, float2 fragmentUV, float aberrationStrength)
+            float ComputeShadow(int lightIndex, float3 positionWS)
             {
-                if (aberrationStrength < 0.001)
-                    return baseColor;
-
-                // 影の中心からの放射方向（UV空間の中心 0.5, 0.5 からの方向）
-                float2 centerUV = float2(0.5, 0.5);
-                float2 direction = fragmentUV - centerUV;
-                float dirLength = length(direction);
-
-                if (dirLength < 0.001)
-                    return baseColor;
-
-                // 放射方向に沿ってRGBチャンネルをオフセット
-                // R: 外側にオフセット（正方向）
-                // G: 変化なし
-                // B: 内側にオフセット（負方向）
-                float offsetAmount = aberrationStrength * dirLength;
-
-                float3 result;
-                result.r = baseColor.r * (1.0 + offsetAmount);
-                result.g = baseColor.g;
-                result.b = baseColor.b * (1.0 - offsetAmount);
-
-                return saturate(result);
+                return ComputeShadowInternal(lightIndex, positionWS, float2(0, 0));
             }
+
+            // ===================================================================
+            // 色収差: RGBチャンネルごとに異なるUV位置で影をサンプリング
+            // 影のエッジにRGBフリンジを生成する
+            // ===================================================================
+
+            // 色収差を適用した影をRGBチャンネル別に計算する
+            // スペクトル多点サンプリングにより、R→G→Bの滑らかなグラデーションを生成
+            // サンプル数はブラー設定に応じて自動調整:
+            //   ブラーなし: 11点（影境界がバイナリなので多点で擬似グラデーション生成）
+            //   ブラーあり:  5点（影自体が既に滑らかなので少なくてOK）
+
+            // ブラー有無でCAサンプル数を切り替え
+            #if BLUR_KERNEL_RADIUS == 0
+                #define CA_SAMPLES 11
+            #else
+                #define CA_SAMPLES 5
+            #endif
+
+            float3 ComputeShadowWithChromaticAberration(int lightIndex, float3 positionWS, float aberrationStrength)
+            {
+                // ライト射影空間でのUV方向を計算
+                float4x4 lightVP = GetLightVPMatrix(lightIndex);
+                float4 posLS = mul(lightVP, float4(positionWS, 1.0));
+
+                if (posLS.w <= 0.0)
+                    return float3(0, 0, 0);
+
+                float2 fragUV = (posLS.xy / posLS.w) * 0.5 + 0.5;
+
+                #if UNITY_UV_STARTS_AT_TOP
+                    fragUV.y = 1.0 - fragUV.y;
+                #endif
+
+                // 投影中心からの放射方向
+                float2 centerUV = float2(0.5, 0.5);
+                float2 dir = fragUV - centerUV;
+                float dirLen = length(dir);
+
+                if (dirLen < 0.001)
+                {
+                    // 中心付近では色収差なし（通常の影を返す）
+                    float s = ComputeShadow(lightIndex, positionWS);
+                    return float3(s, s, s);
+                }
+
+                // UVスケーリング係数
+                float scaleFactor = aberrationStrength * 0.04;
+
+                // スペクトル多点サンプリング
+                // offsetScale: -1(R/内側) → 0(G/中央) → +1(B/外側)
+                // サンプル数が多いほど境界のグラデーションが滑らかになる
+                float3 totalColor = float3(0, 0, 0);
+                float3 totalWeight = float3(0, 0, 0);
+
+                float invLastIndex = 1.0 / (float)(CA_SAMPLES - 1);
+
+                for (int s = 0; s < CA_SAMPLES; s++)
+                {
+                    float t = (float)s * invLastIndex; // 0.0 → 1.0
+                    float offsetScale = t * 2.0 - 1.0; // -1.0 → +1.0
+                    float2 uvOffset = dir * scaleFactor * offsetScale;
+
+                    float shadowVal = ComputeShadowInternal(lightIndex, positionWS, uvOffset);
+
+                    // スペクトル重み: 各サンプル位置のRGB寄与率
+                    // t=0.0: R=1, G=0, B=0 (最も内側 = R)
+                    // t=0.5: R=0, G=1, B=0 (中央 = G)
+                    // t=1.0: R=0, G=0, B=1 (最も外側 = B)
+                    float3 w;
+                    w.r = saturate(1.0 - 2.0 * t);
+                    w.g = 1.0 - abs(2.0 * t - 1.0);
+                    w.b = saturate(2.0 * t - 1.0);
+
+                    totalColor += shadowVal * w;
+                    totalWeight += w;
+                }
+
+                return totalColor / max(totalWeight, float3(0.001, 0.001, 0.001));
+            }
+
+            // CA_SAMPLESマクロはこの関数内でのみ使用するため解除
+            #undef CA_SAMPLES
 
             // ===================================================================
             // フラグメントシェーダー
@@ -611,8 +698,40 @@ Shader "Hidden/ShadowOnlyShader/Floor"
 
                 for (int i = 0; i < lightCount; i++)
                 {
-                    // 影判定（ブラー適用済み）
-                    float shadow = ComputeShadow(i, input.positionWS);
+                    // 色収差の有無で影サンプリング方法を切り替え
+                    float chromaticAberration = GetChromaticAberration(i);
+                    float3 shadowRGB;
+
+                    if (chromaticAberration > 0.001)
+                    {
+                        // 色収差あり: RGBチャンネルごとに異なるUV位置でサンプリング
+                        shadowRGB = ComputeShadowWithChromaticAberration(i, input.positionWS, chromaticAberration);
+
+                        // 光源色による色収差変調:
+                        // 光源に含まれない波長のチャンネルを加重平均に近づけることで
+                        // その波長帯のフリンジを減弱させる（物理的に正しい挙動）
+                        // - 白色光(1,1,1): lerp(x, x, 1) = x → 変化なし（後方互換）
+                        // - 単色赤(1,0,0): G,BがRの値に収束 → 全チャンネル同値 = CAなし
+                        // - 暖色(1,0.8,0.3): 青フリンジ減弱、赤フリンジ維持
+                        float4 caColor = GetChromaticAberrationColor(i);
+                        float caColorSum = caColor.r + caColor.g + caColor.b;
+                        if (caColorSum > 0.001)
+                        {
+                            float shadowWeighted = dot(shadowRGB, caColor.rgb) / caColorSum;
+                            shadowRGB.r = lerp(shadowWeighted, shadowRGB.r, caColor.r);
+                            shadowRGB.g = lerp(shadowWeighted, shadowRGB.g, caColor.g);
+                            shadowRGB.b = lerp(shadowWeighted, shadowRGB.b, caColor.b);
+                        }
+                    }
+                    else
+                    {
+                        // 色収差なし: 通常の影判定
+                        float s = ComputeShadow(i, input.positionWS);
+                        shadowRGB = float3(s, s, s);
+                    }
+
+                    // いずれかのチャンネルに影がある場合
+                    float shadow = max(shadowRGB.r, max(shadowRGB.g, shadowRGB.b));
 
                     if (shadow > 0.0)
                     {
@@ -626,21 +745,27 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                         float hueShift = GetHueShift(i);
                         finalColor = ApplyHueShift(finalColor, hueShift);
 
-                        // 色収差適用（RGBチャンネル分離）
-                        float chromaticAberration = GetChromaticAberration(i);
-                        if (chromaticAberration > 0.001)
-                        {
-                            // フラグメントのUV座標を取得（ライト射影空間）
-                            float4x4 lightVP = GetLightVPMatrix(i);
-                            float4 posLS = mul(lightVP, float4(input.positionWS, 1.0));
-                            float2 fragUV = (posLS.xy / posLS.w) * 0.5 + 0.5;
+                        // 色収差フリンジ処理
+                        // チャンネル差分から控えめなティントを加算し、
+                        // チャンネル平均アルファでエッジに向かって自然にフェードアウト
+                        float3 contribution = finalColor * shadowRGB;
 
-                            finalColor = ApplyChromaticAberration(finalColor, fragUV, chromaticAberration);
+                        float3 fringeDiff = shadowRGB - min(shadowRGB.r, min(shadowRGB.g, shadowRGB.b));
+                        float fringeStrength = max(fringeDiff.r, max(fringeDiff.g, fringeDiff.b));
+
+                        if (fringeStrength > 0.001)
+                        {
+                            // フリンジ方向（正規化）× 自然な強度でティントを加算
+                            // fringeStrength自体がエッジでの減衰を担う
+                            float3 fringeTint = fringeDiff / fringeStrength;
+                            contribution += fringeTint * fringeStrength * 0.5;
                         }
 
                         // 影の寄与を加算合成
-                        totalShadowColor += finalColor * shadow;
-                        totalShadowAlpha += shadowAlpha * shadow;
+                        totalShadowColor += contribution;
+                        // チャンネル平均でアルファを算出 → エッジで自然にフェードアウト
+                        float avgShadow = (shadowRGB.r + shadowRGB.g + shadowRGB.b) / 3.0;
+                        totalShadowAlpha += shadowAlpha * avgShadow;
                     }
                 }
 

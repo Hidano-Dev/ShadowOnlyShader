@@ -70,6 +70,25 @@ namespace ShadowOnlyShader
         float ChromaticAberration { get; set; }
 
         /// <summary>
+        /// 色収差の光源参照。設定されている場合、このLightの色がスペクトル重みの変調に使用される。
+        /// nullの場合はChromaticAberrationColorがフォールバックとして使用される。
+        /// </summary>
+        Light SourceLight { get; set; }
+
+        /// <summary>
+        /// 色収差のフォールバック光源色。SourceLightが未設定の場合に使用される。
+        /// 光源の色に応じてRGB各波長帯の寄与率が変化する。
+        /// 白(1,1,1)=標準CA、単色光=CAなし（物理的に正しい挙動）。
+        /// </summary>
+        Color ChromaticAberrationColor { get; set; }
+
+        /// <summary>
+        /// 実効的な色収差光源色（読み取り専用）。
+        /// SourceLightが設定されていればその色、なければChromaticAberrationColorを返す。
+        /// </summary>
+        Color EffectiveChromaticAberrationColor { get; }
+
+        /// <summary>
         /// 深度バイアス。シャドウアクネを防止するための深度オフセット。
         /// </summary>
         float DepthBias { get; set; }

@@ -236,6 +236,7 @@ namespace ShadowOnlyShader
         private static readonly string[] BlurDistanceFactorNames = GenerateIndexedNames("_BlurDistanceFactor_", 8);
         private static readonly string[] HueShiftNames = GenerateIndexedNames("_HueShift_", 8);
         private static readonly string[] ChromaticAberrationNames = GenerateIndexedNames("_ChromaticAberration_", 8);
+        private static readonly string[] ChromaticAberrationColorNames = GenerateIndexedNames("_ChromaticAberrationColor_", 8);
         private static readonly string[] DepthBiasNames = GenerateIndexedNames("_DepthBias_", 8);
         private static readonly string[] LightWorldPosNames = GenerateIndexedNames("_LightWorldPos_", 8);
         private static readonly string[] DepthTexSizeNames = GenerateIndexedNames("_DepthTexSize_", 8);
@@ -311,6 +312,7 @@ namespace ShadowOnlyShader
 
                 // 色収差
                 _floorMaterial.SetFloat(ChromaticAberrationNames[validLightIndex], vl.ChromaticAberration);
+                _floorMaterial.SetColor(ChromaticAberrationColorNames[validLightIndex], vl.EffectiveChromaticAberrationColor);
 
                 // 深度バイアス
                 _floorMaterial.SetFloat(DepthBiasNames[validLightIndex], vl.DepthBias);

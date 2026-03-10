@@ -71,6 +71,14 @@ namespace ShadowOnlyShader
         [Min(0f)]
         private float _chromaticAberration = 0f;
 
+        [Tooltip("色収差の光源参照（オプション）。設定すると、このLightの色に応じて色収差のフリンジ色が物理的に変化します。暖色光なら赤フリンジが強く、寒色光なら青フリンジが強くなります")]
+        [SerializeField]
+        private Light _sourceLight;
+
+        [Tooltip("色収差の光源色（SourceLight未設定時のフォールバック）。白=標準的なRGB色収差、単色=色収差なし（物理的に正しい挙動）")]
+        [SerializeField]
+        private Color _chromaticAberrationColor = Color.white;
+
         [Header("Depth Bias")]
         [Tooltip("影のちらつき（セルフシャドウ）を抑えるためのオフセット値。影が欠ける場合は値を大きくしてください")]
         [SerializeField]
@@ -198,6 +206,24 @@ namespace ShadowOnlyShader
             get => _chromaticAberration;
             set => _chromaticAberration = Mathf.Max(value, 0f);
         }
+
+        /// <inheritdoc />
+        public Light SourceLight
+        {
+            get => _sourceLight;
+            set => _sourceLight = value;
+        }
+
+        /// <inheritdoc />
+        public Color ChromaticAberrationColor
+        {
+            get => _chromaticAberrationColor;
+            set => _chromaticAberrationColor = value;
+        }
+
+        /// <inheritdoc />
+        public Color EffectiveChromaticAberrationColor =>
+            _sourceLight != null ? _sourceLight.color : _chromaticAberrationColor;
 
         /// <inheritdoc />
         public float DepthBias
