@@ -13,14 +13,17 @@ namespace ShadowOnlyShader
         #region Serialized Fields
 
         [Header("グローバルパラメータ")]
+        [Tooltip("影のぼかし品質。Low は軽量だが粗く、High は滑らかだが処理負荷が高くなります")]
         [SerializeField]
         private BlurQuality _blurQuality = BlurQuality.Mid;
 
+        [Tooltip("影全体の濃さの倍率。1 が標準で、値を上げるとすべての影が濃くなり、下げると薄くなります")]
         [SerializeField]
         [Min(0f)]
         private float _blendMultiplier = 1f;
 
         [Header("床面Renderer")]
+        [Tooltip("影が映り込む床面のRendererを指定します。ここに登録されたオブジェクトの表面に影が描画されます")]
         [SerializeField]
         private List<Renderer> _floorRenderers = new List<Renderer>();
 

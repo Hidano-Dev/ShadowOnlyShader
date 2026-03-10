@@ -13,21 +13,26 @@ namespace ShadowOnlyShader
         #region Serialized Fields - Projection Parameters
 
         [Header("Projection")]
+        [Tooltip("影の投影方式。Orthographic は平行光（太陽光のような均一な影）、Perspective は点光源（近くが大きく遠くが小さい影）になります")]
         [SerializeField]
         private ProjectionMode _projectionMode = ProjectionMode.Orthographic;
 
+        [Tooltip("Perspective モード時の視野角（度）。値が大きいほど広範囲に影が投影されますが、影が歪みやすくなります")]
         [SerializeField]
         [Range(1f, 179f)]
         private float _fieldOfView = 60f;
 
+        [Tooltip("Orthographic モード時の投影範囲の半径。値が大きいほど広い範囲に影を投影できますが、解像度が粗くなります")]
         [SerializeField]
         [Min(0.001f)]
         private float _orthographicSize = 5f;
 
+        [Tooltip("影が描画される最短距離。光源からこの距離より近いオブジェクトは影を落としません")]
         [SerializeField]
         [Min(0.001f)]
         private float _nearClipPlane = 0.1f;
 
+        [Tooltip("影が描画される最長距離。光源からこの距離より遠いオブジェクトは影を落としません")]
         [SerializeField]
         [Min(0.002f)]
         private float _farClipPlane = 100f;
@@ -37,33 +42,41 @@ namespace ShadowOnlyShader
         #region Serialized Fields - Shadow Appearance
 
         [Header("Shadow Appearance")]
+        [Tooltip("影の色。黒以外にも好きな色の影を落とすことができます")]
         [SerializeField]
         private Color _shadowColor = Color.black;
 
+        [Tooltip("影の濃さ。0 で完全に透明、1 で完全に不透明になります")]
         [SerializeField]
         [Range(0f, 1f)]
         private float _shadowAlpha = 0.5f;
 
+        [Tooltip("影のぼかし量。値が大きいほど影の輪郭がやわらかくなります")]
         [SerializeField]
         [Min(0f)]
         private float _blurRadius = 1f;
 
+        [Tooltip("光源からの距離に応じたぼかしの増加量。値が大きいほど、光源から遠い影ほどぼやけます")]
         [SerializeField]
         [Min(0f)]
         private float _blurDistanceFactor = 0f;
 
+        [Tooltip("影の色相を回転させます（0～360度）。色相環に沿って影の色味を変化させる演出に使います")]
         [SerializeField]
         [Range(0f, 360f)]
         private float _hueShift = 0f;
 
+        [Tooltip("色収差の強さ。値が大きいほど影の輪郭にRGBの色ズレが発生し、レンズを通したような演出になります")]
         [SerializeField]
         [Min(0f)]
         private float _chromaticAberration = 0f;
 
         [Header("Depth Bias")]
+        [Tooltip("影のちらつき（セルフシャドウ）を抑えるためのオフセット値。影が欠ける場合は値を大きくしてください")]
         [SerializeField]
         private float _depthBias = 0.005f;
 
+        [Tooltip("面の向きに応じた影のオフセット補正。斜めの面で影がちらつく場合に調整します")]
         [SerializeField]
         private float _normalBias = 0f;
 
@@ -72,9 +85,11 @@ namespace ShadowOnlyShader
         #region Serialized Fields - Caster
 
         [Header("Caster")]
+        [Tooltip("影を落とすオブジェクトの親。この配下にあるすべてのメッシュが影の元になります")]
         [SerializeField]
         private GameObject _casterRoot;
 
+        [Tooltip("影の解像度（ピクセル数）。値が大きいほど影がくっきりしますが、処理負荷が増えます")]
         [SerializeField]
         private int _textureResolution = 1024;
 
