@@ -75,6 +75,10 @@ namespace ShadowOnlyShader
         [SerializeField]
         private Light _sourceLight;
 
+        [Tooltip("有効にすると、SourceLight の Transform（位置・回転）と投影パラメータ（ProjectionMode・FOV・Range 等）を毎フレーム自動同期します")]
+        [SerializeField]
+        private bool _syncWithSourceLight = false;
+
         [Tooltip("色収差の光源色（SourceLight未設定時のフォールバック）。白=標準的なRGB色収差、単色=色収差なし（物理的に正しい挙動）")]
         [SerializeField]
         private Color _chromaticAberrationColor = Color.white;
@@ -212,6 +216,13 @@ namespace ShadowOnlyShader
         {
             get => _sourceLight;
             set => _sourceLight = value;
+        }
+
+        /// <inheritdoc />
+        public bool SyncWithSourceLight
+        {
+            get => _syncWithSourceLight;
+            set => _syncWithSourceLight = value;
         }
 
         /// <inheritdoc />
@@ -386,6 +397,44 @@ namespace ShadowOnlyShader
 
         #endregion
 
+        #region Source Light Sync
+
+        /// <summary>
+        /// SyncWithSourceLightが有効かつSourceLightが設定されている場合、
+        /// Lightコンポーネントから位置・回転と投影パラメータを同期する。
+        /// </summary>
+        private void SyncFromSourceLight()
+        {
+            if (!_syncWithSourceLight || _sourceLight == null) return;
+
+            // Transform同期
+            Transform lightTransform = _sourceLight.transform;
+            Transform t = transform;
+            t.position = lightTransform.position;
+            t.rotation = lightTransform.rotation;
+
+            // 投影パラメータ同期
+            switch (_sourceLight.type)
+            {
+                case LightType.Spot:
+                    _projectionMode = ProjectionMode.Perspective;
+                    _fieldOfView = _sourceLight.spotAngle;
+                    _farClipPlane = _sourceLight.range;
+                    break;
+                case LightType.Directional:
+                    _projectionMode = ProjectionMode.Orthographic;
+                    // Directional lightにはrangeの概念がないため、farClipPlaneは既存値を維持
+                    break;
+                case LightType.Point:
+                    // Point lightは全方向なのでPerspectiveで近似
+                    _projectionMode = ProjectionMode.Perspective;
+                    _farClipPlane = _sourceLight.range;
+                    break;
+            }
+        }
+
+        #endregion
+
         #region MonoBehaviour Lifecycle
 
         private void OnEnable()
@@ -426,6 +475,7 @@ namespace ShadowOnlyShader
 
         private void LateUpdate()
         {
+            SyncFromSourceLight();
             UpdateMatrices();
         }
 

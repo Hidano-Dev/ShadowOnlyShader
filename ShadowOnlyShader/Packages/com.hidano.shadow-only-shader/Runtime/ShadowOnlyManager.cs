@@ -22,7 +22,6 @@ namespace ShadowOnlyShader
         [Min(0f)]
         private float _blendMultiplier = 1f;
 
-        [Header("床面Renderer")]
         [Tooltip("影が映り込む床面のRendererを指定します。ここに登録されたオブジェクトの表面に影が描画されます")]
         [SerializeField]
         private List<Renderer> _floorRenderers = new List<Renderer>();

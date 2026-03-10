@@ -15,7 +15,12 @@ namespace ShadowOnlyShader.Editor
         {
             if (virtualLight == null) return;
 
-            Transform t = virtualLight.transform;
+            // Sync有効時はSourceLightのTransformと投影パラメータで描画する
+            bool useLightTransform = virtualLight.SyncWithSourceLight && virtualLight.SourceLight != null;
+            Transform drawTransform = useLightTransform
+                ? virtualLight.SourceLight.transform
+                : virtualLight.transform;
+
             Color gizmoColor = (gizmoType & GizmoType.Selected) != 0
                 ? new Color(1f, 0.8f, 0f, 0.8f)
                 : new Color(1f, 0.8f, 0f, 0.3f);
@@ -23,18 +28,55 @@ namespace ShadowOnlyShader.Editor
             Gizmos.color = gizmoColor;
 
             Matrix4x4 oldMatrix = Gizmos.matrix;
-            Gizmos.matrix = Matrix4x4.TRS(t.position, t.rotation, Vector3.one);
+            Gizmos.matrix = Matrix4x4.TRS(drawTransform.position, drawTransform.rotation, Vector3.one);
 
-            float near = virtualLight.NearClipPlane;
-            float far = virtualLight.FarClipPlane;
+            // Sync有効時はLightから投影パラメータを取得
+            ProjectionMode projMode;
+            float fov, orthoSize, near, far;
 
-            if (virtualLight.ProjectionMode == ProjectionMode.Orthographic)
+            if (useLightTransform)
             {
-                DrawOrthographicGizmo(virtualLight.OrthographicSize, near, far);
+                Light light = virtualLight.SourceLight;
+                near = virtualLight.NearClipPlane;
+
+                switch (light.type)
+                {
+                    case LightType.Spot:
+                        projMode = ProjectionMode.Perspective;
+                        fov = light.spotAngle;
+                        orthoSize = virtualLight.OrthographicSize;
+                        far = light.range;
+                        break;
+                    case LightType.Point:
+                        projMode = ProjectionMode.Perspective;
+                        fov = virtualLight.FieldOfView;
+                        orthoSize = virtualLight.OrthographicSize;
+                        far = light.range;
+                        break;
+                    default: // Directional
+                        projMode = ProjectionMode.Orthographic;
+                        fov = virtualLight.FieldOfView;
+                        orthoSize = virtualLight.OrthographicSize;
+                        far = virtualLight.FarClipPlane;
+                        break;
+                }
             }
             else
             {
-                DrawPerspectiveGizmo(virtualLight.FieldOfView, near, far);
+                projMode = virtualLight.ProjectionMode;
+                fov = virtualLight.FieldOfView;
+                orthoSize = virtualLight.OrthographicSize;
+                near = virtualLight.NearClipPlane;
+                far = virtualLight.FarClipPlane;
+            }
+
+            if (projMode == ProjectionMode.Orthographic)
+            {
+                DrawOrthographicGizmo(orthoSize, near, far);
+            }
+            else
+            {
+                DrawPerspectiveGizmo(fov, near, far);
             }
 
             Gizmos.matrix = oldMatrix;

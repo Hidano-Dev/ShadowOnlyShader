@@ -76,6 +76,12 @@ namespace ShadowOnlyShader
         Light SourceLight { get; set; }
 
         /// <summary>
+        /// SourceLightからTransformと投影パラメータを自動同期するかどうか。
+        /// trueの場合、SourceLightの位置・回転・LightType・SpotAngle・Range等を毎フレーム反映する。
+        /// </summary>
+        bool SyncWithSourceLight { get; set; }
+
+        /// <summary>
         /// 色収差のフォールバック光源色。SourceLightが未設定の場合に使用される。
         /// 光源の色に応じてRGB各波長帯の寄与率が変化する。
         /// 白(1,1,1)=標準CA、単色光=CAなし（物理的に正しい挙動）。
