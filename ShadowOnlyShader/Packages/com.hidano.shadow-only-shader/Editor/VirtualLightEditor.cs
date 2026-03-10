@@ -36,7 +36,7 @@ namespace ShadowOnlyShader.Editor
             serializedObject.Update();
 
             bool hasSourceLight = _sourceLight.objectReferenceValue != null;
-            bool isSyncing = hasSourceLight && _syncWithSourceLight.boolValue;
+            bool wasSyncing = hasSourceLight && _syncWithSourceLight.boolValue;
 
             // 全プロパティを描画
             SerializedProperty iterator = serializedObject.GetIterator();
@@ -68,7 +68,7 @@ namespace ShadowOnlyShader.Editor
                 }
 
                 // Sync有効時、同期対象のProjectionフィールドは読み取り専用で表示
-                if (isSyncing && IsSyncedField(iterator.propertyPath))
+                if (wasSyncing && IsSyncedField(iterator.propertyPath))
                 {
                     using (new EditorGUI.DisabledScope(true))
                     {
@@ -78,6 +78,24 @@ namespace ShadowOnlyShader.Editor
                 }
 
                 EditorGUILayout.PropertyField(iterator, true);
+            }
+
+            // SyncWithSourceLightトグルの変更を検出し、Undo対応で保存/復元を行う
+            bool isSyncing = hasSourceLight && _syncWithSourceLight.boolValue;
+            if (wasSyncing != isSyncing)
+            {
+                var virtualLight = (VirtualLight)target;
+                Undo.RecordObject(virtualLight, isSyncing ? "Enable SyncWithSourceLight" : "Disable SyncWithSourceLight");
+                Undo.RecordObject(virtualLight.transform, isSyncing ? "Enable SyncWithSourceLight" : "Disable SyncWithSourceLight");
+
+                if (isSyncing)
+                {
+                    virtualLight.SavePreSyncState();
+                }
+                else
+                {
+                    virtualLight.RestorePreSyncState();
+                }
             }
 
             if (isSyncing)

@@ -107,6 +107,18 @@ namespace ShadowOnlyShader
 
         #endregion
 
+        #region Serialized Fields - Pre-Sync Saved State
+
+        [HideInInspector] [SerializeField] private bool _hasSavedPreSyncState;
+        [HideInInspector] [SerializeField] private Vector3 _savedPosition;
+        [HideInInspector] [SerializeField] private Quaternion _savedRotation = Quaternion.identity;
+        [HideInInspector] [SerializeField] private ProjectionMode _savedProjectionMode;
+        [HideInInspector] [SerializeField] private float _savedFieldOfView = 60f;
+        [HideInInspector] [SerializeField] private float _savedOrthographicSize = 5f;
+        [HideInInspector] [SerializeField] private float _savedFarClipPlane = 100f;
+
+        #endregion
+
         #region Private Fields
 
         private Matrix4x4 _viewMatrix = Matrix4x4.identity;
@@ -114,6 +126,11 @@ namespace ShadowOnlyShader
         private Matrix4x4 _viewProjectionMatrix = Matrix4x4.identity;
         private RenderTexture _depthRenderTexture;
         private readonly List<Renderer> _casterRenderers = new List<Renderer>();
+
+        /// <summary>
+        /// 前フレームの同期状態。ランタイムでのON/OFF遷移検出に使用。
+        /// </summary>
+        private bool _wasSyncing;
 
         #endregion
 
@@ -400,6 +417,45 @@ namespace ShadowOnlyShader
         #region Source Light Sync
 
         /// <summary>
+        /// 現在のTransformと投影パラメータを保存する。
+        /// SyncWithSourceLightがONになる直前に呼び出す。
+        /// </summary>
+        internal void SavePreSyncState()
+        {
+            Transform t = transform;
+            _savedPosition = t.position;
+            _savedRotation = t.rotation;
+            _savedProjectionMode = _projectionMode;
+            _savedFieldOfView = _fieldOfView;
+            _savedOrthographicSize = _orthographicSize;
+            _savedFarClipPlane = _farClipPlane;
+            _hasSavedPreSyncState = true;
+        }
+
+        /// <summary>
+        /// 保存済みのTransformと投影パラメータを復元する。
+        /// SyncWithSourceLightがOFFになった直後に呼び出す。
+        /// </summary>
+        internal void RestorePreSyncState()
+        {
+            if (!_hasSavedPreSyncState) return;
+
+            Transform t = transform;
+            t.position = _savedPosition;
+            t.rotation = _savedRotation;
+            _projectionMode = _savedProjectionMode;
+            _fieldOfView = _savedFieldOfView;
+            _orthographicSize = _savedOrthographicSize;
+            _farClipPlane = _savedFarClipPlane;
+            _hasSavedPreSyncState = false;
+        }
+
+        /// <summary>
+        /// 保存済みの同期前状態があるかどうか。
+        /// </summary>
+        internal bool HasSavedPreSyncState => _hasSavedPreSyncState;
+
+        /// <summary>
         /// SyncWithSourceLightが有効かつSourceLightが設定されている場合、
         /// Lightコンポーネントから位置・回転と投影パラメータを同期する。
         /// </summary>
@@ -475,6 +531,21 @@ namespace ShadowOnlyShader
 
         private void LateUpdate()
         {
+            bool isSyncing = _syncWithSourceLight && _sourceLight != null;
+
+            // OFF → ON 遷移: 現在の状態を保存
+            if (isSyncing && !_wasSyncing)
+            {
+                SavePreSyncState();
+            }
+            // ON → OFF 遷移: 保存した状態を復元
+            else if (!isSyncing && _wasSyncing)
+            {
+                RestorePreSyncState();
+            }
+
+            _wasSyncing = isSyncing;
+
             SyncFromSourceLight();
             UpdateMatrices();
         }
