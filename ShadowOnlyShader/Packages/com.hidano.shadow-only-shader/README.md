@@ -63,6 +63,8 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 | Blur Distance Factor | 距離に応じたぼかしの変化量 |
 | Hue Shift | 色相の回転 (0〜360°) |
 | Chromatic Aberration | 色収差の強さ |
+| Source Light | 色収差の光源参照（設定するとLightの色に応じてフリンジ色が変化） |
+| Chromatic Aberration Color | 色収差の光源色（Source Light 未設定時のフォールバック） |
 | Texture Resolution | 深度テクスチャの解像度 (64〜4096) |
 | Caster Root | 影を落とすオブジェクトのルート |
 

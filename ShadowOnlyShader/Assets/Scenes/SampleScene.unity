@@ -283,9 +283,11 @@ MonoBehaviour:
   _shadowColor: {r: 0, g: 0, b: 0, a: 1}
   _shadowAlpha: 0.5
   _blurRadius: 1
-  _blurDistanceFactor: 0
+  _blurDistanceFactor: 0.2
   _hueShift: 0
-  _chromaticAberration: 0
+  _chromaticAberration: 0.05
+  _sourceLight: {fileID: 410087040}
+  _chromaticAberrationColor: {r: 1, g: 1, b: 1, a: 1}
   _depthBias: 0.005
   _normalBias: 0
   _casterRoot: {fileID: 239774089}
