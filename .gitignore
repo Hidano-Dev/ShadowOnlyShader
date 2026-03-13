@@ -69,3 +69,6 @@ crashlytics-build.properties
 Recordings
 .claude/settings.local.json
 ShadowOnlyShader/UserSettings
+ShadowOnlyShader/Assets/_Recovery/
+ShadowOnlyShader/Assets/KizunaAI
+ShadowOnlyShader/Assets/KizunaAI.meta
