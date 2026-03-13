@@ -61,6 +61,21 @@ namespace ShadowOnlyShader
         [Min(0f)]
         private float _blurDistanceFactor = 0f;
 
+        [Tooltip("カメラからの距離に応じたぼかしの増加量。値が大きいほど、カメラから遠い影ほどぼやけます")]
+        [SerializeField]
+        [Min(0f)]
+        private float _blurCameraDistanceFactor = 0f;
+
+        [Tooltip("カメラからの距離に応じた影の減衰量。値が大きいほど、カメラから遠い影ほど薄くなります（近い影は濃いまま保たれます）")]
+        [SerializeField]
+        [Min(0f)]
+        private float _alphaCameraDistanceFactor = 0f;
+
+        [Tooltip("カメラ距離効果のカーブ指数。1=線形、2=二乗（遠方で急変化）、0.5=平方根（近くから速く効く）。ぼかし・アルファ両方に適用されます")]
+        [SerializeField]
+        [Min(0.01f)]
+        private float _cameraDistancePower = 1f;
+
         [Tooltip("影の色相を回転させます（0～360度）。色相環に沿って影の色味を変化させる演出に使います")]
         [SerializeField]
         [Range(0f, 360f)]
@@ -70,6 +85,11 @@ namespace ShadowOnlyShader
         [SerializeField]
         [Min(0f)]
         private float _chromaticAberration = 0f;
+
+        [Tooltip("コンタクトハードニング（PCSS）の強度。値が大きいほど、影元から離れた部分のぼかしが強くなります。0 で無効（従来の均一ブラー）になります")]
+        [SerializeField]
+        [Min(0f)]
+        private float _contactHardeningStrength = 0f;
 
         [Tooltip("色収差の光源参照（オプション）。設定すると、このLightの色に応じて色収差のフリンジ色が物理的に変化します。暖色光なら赤フリンジが強く、寒色光なら青フリンジが強くなります")]
         [SerializeField]
@@ -215,6 +235,27 @@ namespace ShadowOnlyShader
         }
 
         /// <inheritdoc />
+        public float BlurCameraDistanceFactor
+        {
+            get => _blurCameraDistanceFactor;
+            set => _blurCameraDistanceFactor = Mathf.Max(value, 0f);
+        }
+
+        /// <inheritdoc />
+        public float AlphaCameraDistanceFactor
+        {
+            get => _alphaCameraDistanceFactor;
+            set => _alphaCameraDistanceFactor = Mathf.Max(value, 0f);
+        }
+
+        /// <inheritdoc />
+        public float CameraDistancePower
+        {
+            get => _cameraDistancePower;
+            set => _cameraDistancePower = Mathf.Max(value, 0.01f);
+        }
+
+        /// <inheritdoc />
         public float HueShift
         {
             get => _hueShift;
@@ -252,6 +293,13 @@ namespace ShadowOnlyShader
         /// <inheritdoc />
         public Color EffectiveChromaticAberrationColor =>
             _sourceLight != null ? _sourceLight.color : _chromaticAberrationColor;
+
+        /// <inheritdoc />
+        public float ContactHardeningStrength
+        {
+            get => _contactHardeningStrength;
+            set => _contactHardeningStrength = Mathf.Max(value, 0f);
+        }
 
         /// <inheritdoc />
         public float DepthBias
@@ -525,8 +573,12 @@ namespace ShadowOnlyShader
             _shadowAlpha = Mathf.Clamp01(_shadowAlpha);
             _blurRadius = Mathf.Max(_blurRadius, 0f);
             _blurDistanceFactor = Mathf.Max(_blurDistanceFactor, 0f);
+            _blurCameraDistanceFactor = Mathf.Max(_blurCameraDistanceFactor, 0f);
+            _alphaCameraDistanceFactor = Mathf.Max(_alphaCameraDistanceFactor, 0f);
+            _cameraDistancePower = Mathf.Max(_cameraDistancePower, 0.01f);
             _hueShift = Mathf.Clamp(_hueShift, 0f, 360f);
             _chromaticAberration = Mathf.Max(_chromaticAberration, 0f);
+            _contactHardeningStrength = Mathf.Max(_contactHardeningStrength, 0f);
         }
 
         private void LateUpdate()

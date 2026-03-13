@@ -80,7 +80,7 @@ namespace ShadowOnlyShader.Editor
                 var go = new GameObject("VirtualLight");
                 Undo.RegisterCreatedObjectUndo(go, "Add VirtualLight");
                 go.transform.SetParent(manager.transform);
-                go.transform.localPosition = Vector3.zero;
+                go.transform.localPosition = new Vector3(0f, 5f, 0f);
                 go.transform.localRotation = Quaternion.Euler(50f, -30f, 0f);
                 go.AddComponent<VirtualLight>();
                 manager.RefreshVirtualLights();

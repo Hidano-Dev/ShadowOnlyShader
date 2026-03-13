@@ -320,14 +320,32 @@ namespace ShadowOnlyShader.Tests.Runtime
 
         #endregion
 
-        #region ExecutePassメソッドの検証
+        #region 描画メソッドの検証
 
         [Test]
-        public void ExecutePass_staticメソッドが存在する()
+        public void ExecuteDrawCommands_staticメソッドが存在する()
         {
-            var method = typeof(ShadowOnlyRenderPass).GetMethod("ExecutePass",
+            var method = typeof(ShadowOnlyRenderPass).GetMethod("ExecuteDrawCommands",
                 BindingFlags.NonPublic | BindingFlags.Static);
-            Assert.IsNotNull(method, "ExecutePass staticメソッドが存在すること");
+            Assert.IsNotNull(method, "ExecuteDrawCommands staticメソッドが存在すること");
+        }
+
+        [Test]
+        public void Execute_overrideメソッドが存在する()
+        {
+            var method = typeof(ShadowOnlyRenderPass).GetMethod("Execute",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.IsNotNull(method, "Executeメソッドが存在すること");
+            Assert.AreEqual(typeof(ShadowOnlyRenderPass), method.DeclaringType,
+                "ExecuteがShadowOnlyRenderPassでオーバーライドされていること");
+        }
+
+        [Test]
+        public void CollectPassData_メソッドが存在する()
+        {
+            var method = typeof(ShadowOnlyRenderPass).GetMethod("CollectPassData",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.IsNotNull(method, "CollectPassDataメソッドが存在すること");
         }
 
         #endregion

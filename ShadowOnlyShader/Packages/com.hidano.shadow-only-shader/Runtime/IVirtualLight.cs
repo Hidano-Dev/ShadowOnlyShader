@@ -60,6 +60,25 @@ namespace ShadowOnlyShader
         float BlurDistanceFactor { get; set; }
 
         /// <summary>
+        /// カメラ距離ボケ係数。カメラからの距離に応じたブラー半径の変化を制御する。
+        /// 値が大きいほど、カメラから遠い影ほどぼやける。
+        /// </summary>
+        float BlurCameraDistanceFactor { get; set; }
+
+        /// <summary>
+        /// カメラ距離アルファ減衰係数。カメラからの距離に応じて影の濃さを減衰させる。
+        /// 値が大きいほど、カメラから遠い影ほど薄くなる（近い影は濃いまま保たれる）。
+        /// </summary>
+        float AlphaCameraDistanceFactor { get; set; }
+
+        /// <summary>
+        /// カメラ距離効果のべき乗指数。距離をべき乗してからFactorを掛ける。
+        /// 1.0で線形（デフォルト）、1より大きいと遠方で急激に効き、1未満だと近くから素早く効き始める。
+        /// BlurCameraDistanceFactorとAlphaCameraDistanceFactorの両方に適用される。
+        /// </summary>
+        float CameraDistancePower { get; set; }
+
+        /// <summary>
         /// Hue Shift（色相ズレ）。度数（0-360）で指定する。
         /// </summary>
         float HueShift { get; set; }
@@ -93,6 +112,14 @@ namespace ShadowOnlyShader
         /// SourceLightが設定されていればその色、なければChromaticAberrationColorを返す。
         /// </summary>
         Color EffectiveChromaticAberrationColor { get; }
+
+        /// <summary>
+        /// コンタクトハードニング強度。PCSS（Percentage Closer Soft Shadows）による
+        /// キャスター近接部のシャープな影から遠方の柔らかい影への自然なグラデーションを制御する。
+        /// 仮想的な光源サイズに相当し、値が大きいほど半影の広がりが大きくなる。
+        /// 0の場合はコンタクトハードニングを無効にし、従来の均一ブラーが適用される。
+        /// </summary>
+        float ContactHardeningStrength { get; set; }
 
         /// <summary>
         /// 深度バイアス。シャドウアクネを防止するための深度オフセット。

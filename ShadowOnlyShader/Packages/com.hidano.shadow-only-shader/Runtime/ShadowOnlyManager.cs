@@ -233,10 +233,14 @@ namespace ShadowOnlyShader
         private static readonly string[] ShadowAlphaNames = GenerateIndexedNames("_ShadowAlpha_", 8);
         private static readonly string[] BlurRadiusNames = GenerateIndexedNames("_BlurRadius_", 8);
         private static readonly string[] BlurDistanceFactorNames = GenerateIndexedNames("_BlurDistanceFactor_", 8);
+        private static readonly string[] BlurCameraDistanceFactorNames = GenerateIndexedNames("_BlurCameraDistanceFactor_", 8);
+        private static readonly string[] AlphaCameraDistanceFactorNames = GenerateIndexedNames("_AlphaCameraDistanceFactor_", 8);
+        private static readonly string[] CameraDistancePowerNames = GenerateIndexedNames("_CameraDistancePower_", 8);
         private static readonly string[] HueShiftNames = GenerateIndexedNames("_HueShift_", 8);
         private static readonly string[] ChromaticAberrationNames = GenerateIndexedNames("_ChromaticAberration_", 8);
         private static readonly string[] ChromaticAberrationColorNames = GenerateIndexedNames("_ChromaticAberrationColor_", 8);
         private static readonly string[] DepthBiasNames = GenerateIndexedNames("_DepthBias_", 8);
+        private static readonly string[] ContactHardeningStrengthNames = GenerateIndexedNames("_ContactHardeningStrength_", 8);
         private static readonly string[] LightWorldPosNames = GenerateIndexedNames("_LightWorldPos_", 8);
         private static readonly string[] DepthTexSizeNames = GenerateIndexedNames("_DepthTexSize_", 8);
 
@@ -305,6 +309,9 @@ namespace ShadowOnlyShader
                 // ブラー関連
                 _floorMaterial.SetFloat(BlurRadiusNames[validLightIndex], vl.BlurRadius);
                 _floorMaterial.SetFloat(BlurDistanceFactorNames[validLightIndex], vl.BlurDistanceFactor);
+                _floorMaterial.SetFloat(BlurCameraDistanceFactorNames[validLightIndex], vl.BlurCameraDistanceFactor);
+                _floorMaterial.SetFloat(AlphaCameraDistanceFactorNames[validLightIndex], vl.AlphaCameraDistanceFactor);
+                _floorMaterial.SetFloat(CameraDistancePowerNames[validLightIndex], vl.CameraDistancePower);
 
                 // Hue Shift
                 _floorMaterial.SetFloat(HueShiftNames[validLightIndex], vl.HueShift);
@@ -315,6 +322,9 @@ namespace ShadowOnlyShader
 
                 // 深度バイアス
                 _floorMaterial.SetFloat(DepthBiasNames[validLightIndex], vl.DepthBias);
+
+                // コンタクトハードニング（PCSS）
+                _floorMaterial.SetFloat(ContactHardeningStrengthNames[validLightIndex], vl.ContactHardeningStrength);
 
                 // 光源ワールド位置（距離ボケ計算用）
                 Vector3 pos = vl.transform.position;

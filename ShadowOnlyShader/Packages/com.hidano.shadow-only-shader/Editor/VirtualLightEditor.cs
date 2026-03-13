@@ -14,6 +14,7 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _sourceLight;
         private SerializedProperty _syncWithSourceLight;
         private SerializedProperty _chromaticAberrationColor;
+        private SerializedProperty _projectionMode;
 
         // Projection fields that are synced from SourceLight
         private static readonly string[] SyncedProjectionFields =
@@ -29,6 +30,7 @@ namespace ShadowOnlyShader.Editor
             _sourceLight = serializedObject.FindProperty("_sourceLight");
             _syncWithSourceLight = serializedObject.FindProperty("_syncWithSourceLight");
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
+            _projectionMode = serializedObject.FindProperty("_projectionMode");
         }
 
         public override void OnInspectorGUI()
@@ -57,6 +59,13 @@ namespace ShadowOnlyShader.Editor
 
                 // SourceLightが未設定の場合、SyncWithSourceLightトグルを非表示
                 if (iterator.propertyPath == "_syncWithSourceLight" && !hasSourceLight)
+                {
+                    continue;
+                }
+
+                // Orthographicモード時、FieldOfViewを非表示
+                if (iterator.propertyPath == "_fieldOfView"
+                    && _projectionMode.enumValueIndex == (int)ProjectionMode.Orthographic)
                 {
                     continue;
                 }

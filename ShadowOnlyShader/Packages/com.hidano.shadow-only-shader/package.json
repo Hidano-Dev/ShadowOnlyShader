@@ -1,6 +1,6 @@
 {
     "name": "com.hidano.shadow-only-shader",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "displayName": "Shadow Only Shader",
     "description": "URP向けの影だけを表示するシェーダーシステム。仮想光源からの深度テクスチャ生成とプロジェクティブテクスチャマッピングにより、透明な床面上にキャラクターの影のみを描画します。",
     "unity": "6000.3",
@@ -14,7 +14,9 @@
         "urp",
         "shader",
         "vtuber",
-        "render-pipeline"
+        "render-pipeline",
+        "skinned-mesh",
+        "character"
     ],
     "author": {
         "name": "ShadowOnlyShader"

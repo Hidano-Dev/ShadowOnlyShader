@@ -36,7 +36,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 
 ### 4. キャスターを設定する
 
-影を落としたいオブジェクト (キャラクターモデルなど) のルート GameObject を VirtualLight の **Caster Root** に指定します。その配下のすべての Renderer が影の投影元になります。
+影を落としたいオブジェクト (キャラクターモデルなど) のルート GameObject を VirtualLight の **Caster Root** に指定します。その配下のすべての Renderer (MeshRenderer・SkinnedMeshRenderer) が影の投影元になります。
 
 ### 5. 床面を登録する
 
@@ -60,7 +60,11 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 | Shadow Color | 影の色 |
 | Shadow Alpha | 影の不透明度 (0.0〜1.0) |
 | Blur Radius | ぼかしの強さ |
-| Blur Distance Factor | 距離に応じたぼかしの変化量 |
+| Blur Distance Factor | 光源からの距離に応じたぼかしの変化量 |
+| Blur Camera Distance Factor | カメラからの距離に応じたぼかしの増加量 |
+| Alpha Camera Distance Factor | カメラからの距離に応じた影の減衰量 |
+| Camera Distance Power | カメラ距離効果のカーブ指数 (1=線形) |
+| Contact Hardening Strength | PCSS コンタクトハードニングの強度 (0 で無効) |
 | Hue Shift | 色相の回転 (0〜360°) |
 | Chromatic Aberration | 色収差の強さ |
 | Source Light | 色収差の光源参照（設定するとLightの色に応じてフリンジ色が変化） |

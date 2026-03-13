@@ -139,6 +139,36 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             float _BlurDistanceFactor_6;
             float _BlurDistanceFactor_7;
 
+            // カメラ距離ボケ係数
+            float _BlurCameraDistanceFactor_0;
+            float _BlurCameraDistanceFactor_1;
+            float _BlurCameraDistanceFactor_2;
+            float _BlurCameraDistanceFactor_3;
+            float _BlurCameraDistanceFactor_4;
+            float _BlurCameraDistanceFactor_5;
+            float _BlurCameraDistanceFactor_6;
+            float _BlurCameraDistanceFactor_7;
+
+            // カメラ距離べき乗指数
+            float _CameraDistancePower_0;
+            float _CameraDistancePower_1;
+            float _CameraDistancePower_2;
+            float _CameraDistancePower_3;
+            float _CameraDistancePower_4;
+            float _CameraDistancePower_5;
+            float _CameraDistancePower_6;
+            float _CameraDistancePower_7;
+
+            // カメラ距離アルファ減衰係数
+            float _AlphaCameraDistanceFactor_0;
+            float _AlphaCameraDistanceFactor_1;
+            float _AlphaCameraDistanceFactor_2;
+            float _AlphaCameraDistanceFactor_3;
+            float _AlphaCameraDistanceFactor_4;
+            float _AlphaCameraDistanceFactor_5;
+            float _AlphaCameraDistanceFactor_6;
+            float _AlphaCameraDistanceFactor_7;
+
             // Hue Shift（度数 0-360）
             float _HueShift_0;
             float _HueShift_1;
@@ -170,6 +200,16 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             float4 _ChromaticAberrationColor_5;
             float4 _ChromaticAberrationColor_6;
             float4 _ChromaticAberrationColor_7;
+
+            // コンタクトハードニング（PCSS）強度
+            float _ContactHardeningStrength_0;
+            float _ContactHardeningStrength_1;
+            float _ContactHardeningStrength_2;
+            float _ContactHardeningStrength_3;
+            float _ContactHardeningStrength_4;
+            float _ContactHardeningStrength_5;
+            float _ContactHardeningStrength_6;
+            float _ContactHardeningStrength_7;
 
             // 各仮想光源のワールド位置（距離ボケ計算用）
             float4 _LightWorldPos_0;
@@ -290,6 +330,42 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 return _BlurDistanceFactor_7;
             }
 
+            float GetBlurCameraDistanceFactor(int index)
+            {
+                if (index == 0) return _BlurCameraDistanceFactor_0;
+                if (index == 1) return _BlurCameraDistanceFactor_1;
+                if (index == 2) return _BlurCameraDistanceFactor_2;
+                if (index == 3) return _BlurCameraDistanceFactor_3;
+                if (index == 4) return _BlurCameraDistanceFactor_4;
+                if (index == 5) return _BlurCameraDistanceFactor_5;
+                if (index == 6) return _BlurCameraDistanceFactor_6;
+                return _BlurCameraDistanceFactor_7;
+            }
+
+            float GetAlphaCameraDistanceFactor(int index)
+            {
+                if (index == 0) return _AlphaCameraDistanceFactor_0;
+                if (index == 1) return _AlphaCameraDistanceFactor_1;
+                if (index == 2) return _AlphaCameraDistanceFactor_2;
+                if (index == 3) return _AlphaCameraDistanceFactor_3;
+                if (index == 4) return _AlphaCameraDistanceFactor_4;
+                if (index == 5) return _AlphaCameraDistanceFactor_5;
+                if (index == 6) return _AlphaCameraDistanceFactor_6;
+                return _AlphaCameraDistanceFactor_7;
+            }
+
+            float GetCameraDistancePower(int index)
+            {
+                if (index == 0) return _CameraDistancePower_0;
+                if (index == 1) return _CameraDistancePower_1;
+                if (index == 2) return _CameraDistancePower_2;
+                if (index == 3) return _CameraDistancePower_3;
+                if (index == 4) return _CameraDistancePower_4;
+                if (index == 5) return _CameraDistancePower_5;
+                if (index == 6) return _CameraDistancePower_6;
+                return _CameraDistancePower_7;
+            }
+
             float GetHueShift(int index)
             {
                 if (index == 0) return _HueShift_0;
@@ -336,6 +412,18 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 if (index == 5) return _LightWorldPos_5;
                 if (index == 6) return _LightWorldPos_6;
                 return _LightWorldPos_7;
+            }
+
+            float GetContactHardeningStrength(int index)
+            {
+                if (index == 0) return _ContactHardeningStrength_0;
+                if (index == 1) return _ContactHardeningStrength_1;
+                if (index == 2) return _ContactHardeningStrength_2;
+                if (index == 3) return _ContactHardeningStrength_3;
+                if (index == 4) return _ContactHardeningStrength_4;
+                if (index == 5) return _ContactHardeningStrength_5;
+                if (index == 6) return _ContactHardeningStrength_6;
+                return _ContactHardeningStrength_7;
             }
 
             float4 GetDepthTexSize(int index)
@@ -437,6 +525,53 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             }
 
             // ===================================================================
+            // PCSS: ブロッカーサーチ
+            // 周辺の深度テクスチャをサンプリングし、遮蔽物の平均深度を求める
+            // 戻り値: x = 平均ブロッカー深度, y = ブロッカー数（0 = 影なし）
+            // ===================================================================
+
+            #if BLUR_KERNEL_RADIUS > 0
+            // ブロッカーサーチ用のサンプリング半径（カーネル半径の半分で粗くサンプリング）
+            #define BLOCKER_SEARCH_RADIUS ((BLUR_KERNEL_RADIUS + 1) / 2)
+
+            float2 BlockerSearch(int lightIndex, float2 shadowUV, float fragmentDepth,
+                                 float2 texelSize, float searchRadius, float bias)
+            {
+                float blockerSum = 0.0;
+                float blockerCount = 0.0;
+
+                [loop] for (int y = -BLOCKER_SEARCH_RADIUS; y <= BLOCKER_SEARCH_RADIUS; y++)
+                {
+                    [loop] for (int x = -BLOCKER_SEARCH_RADIUS; x <= BLOCKER_SEARCH_RADIUS; x++)
+                    {
+                        float2 sampleUV = shadowUV + float2((float)x, (float)y) * texelSize * searchRadius;
+
+                        if (sampleUV.x < 0.0 || sampleUV.x > 1.0 ||
+                            sampleUV.y < 0.0 || sampleUV.y > 1.0)
+                        {
+                            continue;
+                        }
+
+                        float sampledDepth = SampleShadowDepth(lightIndex, sampleUV);
+
+                        // ブロッカー判定: フラグメントより手前にある深度値を収集
+                        #if UNITY_REVERSED_Z
+                        if (sampledDepth > fragmentDepth + bias)
+                        #else
+                        if (sampledDepth < fragmentDepth - bias)
+                        #endif
+                        {
+                            blockerSum += sampledDepth;
+                            blockerCount += 1.0;
+                        }
+                    }
+                }
+
+                return float2(blockerSum, blockerCount);
+            }
+            #endif
+
+            // ===================================================================
             // ガウシアンブラー重み計算
             // ===================================================================
 
@@ -529,6 +664,16 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 #if BLUR_KERNEL_RADIUS == 0
                     return ComputeShadowAtUV(lightIndex, shadowUV, fragmentDepth, bias);
                 #else
+                    // テクセルサイズの取得
+                    float4 texSize = GetDepthTexSize(lightIndex);
+                    float2 texelSize = texSize.zw; // (1/width, 1/height)
+
+                    // テクセルサイズが0の場合のフォールバック（安全策）
+                    if (texelSize.x < 0.000001)
+                    {
+                        texelSize = float2(1.0 / 1024.0, 1.0 / 1024.0);
+                    }
+
                     // ガウシアンサンプリングブラー
                     float blurRadius = GetBlurRadius(lightIndex);
 
@@ -542,20 +687,51 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                         blurRadius *= (1.0 + dist * blurDistanceFactor);
                     }
 
+                    // カメラ距離ボケ: カメラからの距離に応じたブラー半径の動的変化
+                    float blurCameraDistanceFactor = GetBlurCameraDistanceFactor(lightIndex);
+                    if (blurCameraDistanceFactor > 0.0)
+                    {
+                        float3 cameraPos = GetCameraPositionWS();
+                        float cameraDist = length(positionWS - cameraPos);
+                        // べき乗で距離カーブを調整（power=1:線形, >1:遠方で急激, <1:近くから効く）
+                        float cameraDistPower = GetCameraDistancePower(lightIndex);
+                        float scaledDist = pow(max(cameraDist, 0.001), cameraDistPower);
+                        blurRadius *= (1.0 + scaledDist * blurCameraDistanceFactor);
+                    }
+
+                    // PCSS: コンタクトハードニング
+                    // キャスターとレシーバーの深度差に基づくブラー半径の動的変化
+                    float contactHardening = GetContactHardeningStrength(lightIndex);
+                    if (contactHardening > 0.0)
+                    {
+                        // ブロッカーサーチ: 検索半径はベースブラー半径を使用
+                        float searchRadius = max(blurRadius, 1.0);
+                        float2 blockerResult = BlockerSearch(lightIndex, shadowUV, fragmentDepth,
+                                                             texelSize, searchRadius, bias);
+
+                        if (blockerResult.y < 0.5)
+                        {
+                            // ブロッカーなし = 影なし
+                            return 0.0;
+                        }
+
+                        // 平均ブロッカー深度
+                        float avgBlockerDepth = blockerResult.x / blockerResult.y;
+
+                        // ペナンブラ幅の推定
+                        // PCSS公式: penumbra = lightSize * |d_receiver - d_blocker| / d_blocker
+                        float depthDiff = abs(fragmentDepth - avgBlockerDepth);
+                        float penumbraWidth = contactHardening * depthDiff / max(abs(avgBlockerDepth), 0.001);
+
+                        // ペナンブラ幅をブラー半径に加算
+                        // ベースのblurRadiusが最小値として機能し、ペナンブラで増幅される
+                        blurRadius = max(blurRadius, penumbraWidth);
+                    }
+
                     // ブラー半径が0の場合は単一サンプルにフォールバック
                     if (blurRadius < 0.001)
                     {
                         return ComputeShadowAtUV(lightIndex, shadowUV, fragmentDepth, bias);
-                    }
-
-                    // テクセルサイズの取得
-                    float4 texSize = GetDepthTexSize(lightIndex);
-                    float2 texelSize = texSize.zw; // (1/width, 1/height)
-
-                    // テクセルサイズが0の場合のフォールバック（安全策）
-                    if (texelSize.x < 0.000001)
-                    {
-                        texelSize = float2(1.0 / 1024.0, 1.0 / 1024.0);
                     }
 
                     // ガウシアンブラー: カーネル半径に応じたサンプリング
@@ -738,6 +914,18 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                         // 影の色と濃さを取得
                         float4 shadowColor = GetShadowColor(i);
                         float shadowAlpha = GetShadowAlpha(i);
+
+                        // カメラ距離アルファ減衰: カメラから遠いほど影が薄くなる
+                        float alphaCameraDistanceFactor = GetAlphaCameraDistanceFactor(i);
+                        if (alphaCameraDistanceFactor > 0.0)
+                        {
+                            float3 cameraPos = GetCameraPositionWS();
+                            float cameraDist = length(input.positionWS - cameraPos);
+                            // べき乗で距離カーブを調整
+                            float cameraDistPower = GetCameraDistancePower(i);
+                            float scaledDist = pow(max(cameraDist, 0.001), cameraDistPower);
+                            shadowAlpha *= saturate(1.0 / (1.0 + scaledDist * alphaCameraDistanceFactor));
+                        }
 
                         float3 finalColor = shadowColor.rgb;
 

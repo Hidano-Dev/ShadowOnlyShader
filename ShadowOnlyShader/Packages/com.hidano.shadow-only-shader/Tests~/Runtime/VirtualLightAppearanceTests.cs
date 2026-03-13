@@ -78,6 +78,12 @@ namespace ShadowOnlyShader.Tests.Runtime
             Assert.AreEqual(0f, _virtualLight.NormalBias, 0.001f);
         }
 
+        [Test]
+        public void ContactHardeningStrength_デフォルト値は0()
+        {
+            Assert.AreEqual(0f, _virtualLight.ContactHardeningStrength, 0.001f);
+        }
+
         #endregion
 
         #region ShadowColor テスト
@@ -322,6 +328,31 @@ namespace ShadowOnlyShader.Tests.Runtime
             // 法線バイアスは負の値も許容する
             _virtualLight.NormalBias = -0.05f;
             Assert.AreEqual(-0.05f, _virtualLight.NormalBias, 0.0001f);
+        }
+
+        #endregion
+
+        #region ContactHardeningStrength テスト
+
+        [Test]
+        public void ContactHardeningStrength_有効値を設定できる()
+        {
+            _virtualLight.ContactHardeningStrength = 2.0f;
+            Assert.AreEqual(2.0f, _virtualLight.ContactHardeningStrength, 0.001f);
+        }
+
+        [Test]
+        public void ContactHardeningStrength_0を設定できる()
+        {
+            _virtualLight.ContactHardeningStrength = 0f;
+            Assert.AreEqual(0f, _virtualLight.ContactHardeningStrength, 0.001f);
+        }
+
+        [Test]
+        public void ContactHardeningStrength_負の値は0にクランプされる()
+        {
+            _virtualLight.ContactHardeningStrength = -1.0f;
+            Assert.AreEqual(0f, _virtualLight.ContactHardeningStrength, 0.001f);
         }
 
         #endregion

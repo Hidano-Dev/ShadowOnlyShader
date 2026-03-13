@@ -230,6 +230,23 @@ namespace ShadowOnlyShader.Tests.Runtime
 
         #endregion
 
+        #region コンタクトハードニング強度の転送テスト
+
+        [Test]
+        public void UpdateMaterialProperties_コンタクトハードニング強度がMaterialに設定される()
+        {
+            IVirtualLight vl = _manager.AddVirtualLight();
+            vl.ContactHardeningStrength = 1.5f;
+
+            Material mat = _manager.FloorMaterial;
+            _manager.UpdateMaterialProperties();
+
+            Assert.AreEqual(1.5f, mat.GetFloat("_ContactHardeningStrength_0"), 0.001f,
+                "_ContactHardeningStrength_0が正しく設定されること");
+        }
+
+        #endregion
+
         #region 深度バイアスの転送テスト
 
         [Test]

@@ -5,6 +5,37 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.3.0] - 2026-03-13
+
+### 追加
+
+- コンタクトハードニング（PCSS）機能 — キャスターとの距離に応じた自然な半影表現
+  - `ContactHardeningStrength` パラメータで仮想光源サイズを制御
+  - ブロッカーサーチによる平均遮蔽深度の推定とペナンブラ幅の動的計算
+  - 0 で無効（従来の均一ブラー）、値が大きいほど遠方の影がより柔らかくなる
+- カメラ距離ベースの影効果
+  - `BlurCameraDistanceFactor` — カメラからの距離に応じたブラー半径の増加
+  - `AlphaCameraDistanceFactor` — カメラからの距離に応じた影の透明度減衰
+  - `CameraDistancePower` — 距離カーブのべき乗指数（1=線形、>1で遠方急変化、<1で近くから効く）
+
+### 修正
+
+- RenderGraph UnsafePass でカメラのカラー/デプスターゲットが復元されない問題を修正
+  - Unity Recorder 等の非デフォルトレンダーターゲット環境で後続パスの描画が壊れる問題を解消
+- キャスター Renderer が 0 件の場合に深度テクスチャがクリアされない問題を修正
+
+### 改善
+
+- VirtualLight Editor で Orthographic モード時に FieldOfView を自動非表示
+- VirtualLight 新規作成時のデフォルト位置を (0, 5, 0) に変更（地面から離れた自然な初期位置）
+
+## [0.2.1] - 2026-03-10
+
+### 改善
+
+- SkinnedMeshRenderer 対応をドキュメントに明記（セットアップ手順・特徴欄）
+- package.json に `skinned-mesh`・`character` キーワードを追加
+
 ## [0.2.0] - 2026-03-10
 
 ### 追加
