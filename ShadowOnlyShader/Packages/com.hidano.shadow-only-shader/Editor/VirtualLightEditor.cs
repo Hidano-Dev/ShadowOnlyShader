@@ -63,7 +63,6 @@ namespace ShadowOnlyShader.Editor
         {
             "_projectionMode",
             "_fieldOfView",
-            "_orthographicSize",
             "_farClipPlane",
             "_shadowAlpha",
         };
@@ -138,6 +137,17 @@ namespace ShadowOnlyShader.Editor
                     && _projectionMode.enumValueIndex == (int)ProjectionMode.Orthographic)
                 {
                     continue;
+                }
+
+                // SourceLightが非DirectionalのときはOrthographicSizeを非表示（Perspective投影のため不要）
+                // DirectionalLightのときは投影範囲の調整が必要なので表示する
+                if (iterator.propertyPath == "_orthographicSize" && hasSourceLight)
+                {
+                    var light = _sourceLight.objectReferenceValue as Light;
+                    if (light != null && light.type != LightType.Directional)
+                    {
+                        continue;
+                    }
                 }
 
                 // SourceLightが設定されている場合、ChromaticAberrationColorを非表示
