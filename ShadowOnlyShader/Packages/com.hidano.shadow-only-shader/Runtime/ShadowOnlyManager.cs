@@ -303,17 +303,22 @@ namespace ShadowOnlyShader
         {
             if (_floorMaterial != null) return;
 
-            // ShadowOnlyFloorシェーダーがまだ存在しない場合はStandardシェーダーで代替
-            // Task 6でShadowOnlyFloorシェーダーが実装された際に切り替える
             var shader = Shader.Find("Hidden/ShadowOnlyShader/Floor");
             if (shader == null)
             {
-                // フォールバック: 基本的なUnlitシェーダーで仮のMaterialを生成
-                shader = Shader.Find("Unlit/Transparent");
-                if (shader == null)
-                {
-                    shader = Shader.Find("Standard");
-                }
+                // URP環境でのフォールバック
+                shader = Shader.Find("Universal Render Pipeline/Unlit");
+            }
+            if (shader == null)
+            {
+                // 最終フォールバック: 全Unity環境に存在する内部シェーダー
+                shader = Shader.Find("Hidden/InternalErrorShader");
+            }
+
+            if (shader == null)
+            {
+                Debug.LogWarning("[ShadowOnlyShader] 床面用シェーダーが見つかりません。");
+                return;
             }
 
             _floorMaterial = new Material(shader);
