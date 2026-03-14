@@ -37,8 +37,6 @@ namespace ShadowOnlyShader.Editor
             "_fieldOfView",
             "_orthographicSize",
             "_farClipPlane",
-            "_depthBias",
-            "_normalBias",
             "_shadowAlpha",
         };
 
@@ -129,7 +127,7 @@ namespace ShadowOnlyShader.Editor
             if (hasSourceLight)
             {
                 EditorGUILayout.HelpBox(
-                    "SourceLight から Transform・投影パラメータ・Bias・ShadowAlpha を自動同期中です。",
+                    "SourceLight から Transform・投影パラメータ・ShadowAlpha を自動同期中です。",
                     MessageType.Info);
             }
 

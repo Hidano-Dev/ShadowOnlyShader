@@ -508,8 +508,6 @@ namespace ShadowOnlyShader
             _savedFieldOfView = _fieldOfView;
             _savedOrthographicSize = _orthographicSize;
             _savedFarClipPlane = _farClipPlane;
-            _savedDepthBias = _depthBias;
-            _savedNormalBias = _normalBias;
             _savedShadowAlpha = _shadowAlpha;
             _hasSavedPreSyncState = true;
         }
@@ -529,8 +527,6 @@ namespace ShadowOnlyShader
             _fieldOfView = _savedFieldOfView;
             _orthographicSize = _savedOrthographicSize;
             _farClipPlane = _savedFarClipPlane;
-            _depthBias = _savedDepthBias;
-            _normalBias = _savedNormalBias;
             _shadowAlpha = _savedShadowAlpha;
             _hasSavedPreSyncState = false;
         }
@@ -572,10 +568,6 @@ namespace ShadowOnlyShader
                     _farClipPlane = _sourceLight.range;
                     break;
             }
-
-            // バイアス同期
-            _depthBias = _sourceLight.shadowBias;
-            _normalBias = _sourceLight.shadowNormalBias;
 
             // 影の濃さ同期
             _shadowAlpha = _sourceLight.shadowStrength;
