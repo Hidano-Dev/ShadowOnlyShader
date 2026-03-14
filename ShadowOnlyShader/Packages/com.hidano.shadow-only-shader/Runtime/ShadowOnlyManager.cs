@@ -223,13 +223,24 @@ namespace ShadowOnlyShader
         /// <summary>
         /// 深度Texture2DArrayの存在と解像度を確認し、必要に応じて作成・再作成する。
         /// 全VirtualLightの深度テクスチャは統一解像度のTexture2DArrayとして管理される。
+        /// スライス数は実際のアクティブVirtualLight数に合わせ、不要なメモリ消費を防ぐ。
         /// </summary>
         private void EnsureDepthArrayTexture()
         {
             int resolution = ResolveTextureResolution();
+            int sliceCount = CountActiveVirtualLights();
 
-            // 既存のTexture2DArrayが存在し、解像度が一致する場合はそのまま
-            if (_depthArrayTexture != null && _depthArrayTexture.width == resolution)
+            // アクティブなVirtualLightがない場合はテクスチャ不要
+            if (sliceCount == 0)
+            {
+                ReleaseDepthArrayTexture();
+                return;
+            }
+
+            // 既存のTexture2DArrayが存在し、解像度・スライス数が一致する場合はそのまま
+            if (_depthArrayTexture != null
+                && _depthArrayTexture.width == resolution
+                && _depthArrayTexture.volumeDepth == sliceCount)
             {
                 return;
             }
@@ -237,12 +248,29 @@ namespace ShadowOnlyShader
             // 古いTexture2DArrayを破棄
             ReleaseDepthArrayTexture();
 
-            // 新しいTexture2DArrayを作成
+            // 新しいTexture2DArrayを作成（スライス数は実際のアクティブライト数）
             _depthArrayTexture = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.Depth);
             _depthArrayTexture.dimension = TextureDimension.Tex2DArray;
-            _depthArrayTexture.volumeDepth = MaxVirtualLights;
+            _depthArrayTexture.volumeDepth = sliceCount;
             _depthArrayTexture.hideFlags = HideFlags.DontSave;
             _depthArrayTexture.Create();
+        }
+
+        /// <summary>
+        /// アクティブなVirtualLightの数を返す（最大MaxVirtualLights）。
+        /// </summary>
+        private int CountActiveVirtualLights()
+        {
+            int count = 0;
+            for (int i = 0; i < _virtualLights.Count && count < MaxVirtualLights; i++)
+            {
+                var vl = _virtualLights[i];
+                if (vl != null && vl.isActiveAndEnabled)
+                {
+                    count++;
+                }
+            }
+            return count;
         }
 
         /// <summary>
