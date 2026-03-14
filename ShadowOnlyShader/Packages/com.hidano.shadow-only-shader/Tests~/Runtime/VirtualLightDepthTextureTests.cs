@@ -141,10 +141,10 @@ namespace ShadowOnlyShader.Tests.Runtime
         }
 
         [Test]
-        public void TextureResolution_4096超は4096にクランプされる()
+        public void TextureResolution_8192超は8192にクランプされる()
         {
-            _virtualLight.TextureResolution = 8192;
-            Assert.AreEqual(4096, _virtualLight.TextureResolution);
+            _virtualLight.TextureResolution = 16384;
+            Assert.AreEqual(8192, _virtualLight.TextureResolution);
         }
 
         [Test]

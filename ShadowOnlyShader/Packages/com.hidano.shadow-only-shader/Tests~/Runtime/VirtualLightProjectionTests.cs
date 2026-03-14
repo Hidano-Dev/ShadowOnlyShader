@@ -63,9 +63,9 @@ namespace ShadowOnlyShader.Tests.Runtime
         }
 
         [Test]
-        public void NearClipPlane_DefaultIs01()
+        public void NearClipPlane_DefaultIs0001()
         {
-            Assert.AreEqual(0.1f, _virtualLight.NearClipPlane, 0.001f);
+            Assert.AreEqual(0.001f, _virtualLight.NearClipPlane, 0.0001f);
         }
 
         [Test]

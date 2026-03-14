@@ -17,7 +17,7 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _textureResolution;
 
         // 解像度ドロップダウンの選択肢（0 = URP Default）
-        private static readonly int[] ResolutionValues = { 0, 64, 128, 256, 512, 1024, 2048, 4096 };
+        private static readonly int[] ResolutionValues = { 0, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
         private static readonly GUIContent[] ResolutionLabels =
         {
             new GUIContent("URP Default"),
@@ -28,6 +28,7 @@ namespace ShadowOnlyShader.Editor
             new GUIContent("1024"),
             new GUIContent("2048"),
             new GUIContent("4096"),
+            new GUIContent("8192"),
         };
 
         // SourceLight設定時に非表示にするフィールド

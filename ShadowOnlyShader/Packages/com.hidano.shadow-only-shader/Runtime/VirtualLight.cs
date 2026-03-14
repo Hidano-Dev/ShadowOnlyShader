@@ -60,7 +60,7 @@ namespace ShadowOnlyShader
         [Tooltip("影が描画される最短距離。光源からこの距離より近いオブジェクトは影を落としません")]
         [SerializeField]
         [Min(0.001f)]
-        private float _nearClipPlane = 0.1f;
+        private float _nearClipPlane = 0.001f;
 
         [Tooltip("影が描画される最長距離。光源からこの距離より遠いオブジェクトは影を落としません")]
         [SerializeField]
@@ -211,7 +211,7 @@ namespace ShadowOnlyShader
         public int TextureResolution
         {
             get => _textureResolution;
-            set => _textureResolution = Mathf.Clamp(value, 64, 4096);
+            set => _textureResolution = Mathf.Clamp(value, 64, 8192);
         }
 
         #endregion
@@ -606,7 +606,7 @@ namespace ShadowOnlyShader
             _farClipPlane = Mathf.Max(_farClipPlane, _nearClipPlane + 0.001f);
             if (_textureResolution != UseURPResolution)
             {
-                _textureResolution = Mathf.Clamp(_textureResolution, 64, 4096);
+                _textureResolution = Mathf.Clamp(_textureResolution, 64, 8192);
             }
             _shadowAlpha = Mathf.Clamp01(_shadowAlpha);
             _blurRadius = Mathf.Max(_blurRadius, 0f);

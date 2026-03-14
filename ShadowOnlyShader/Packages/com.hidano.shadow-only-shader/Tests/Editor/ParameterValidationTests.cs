@@ -40,11 +40,11 @@ namespace ShadowOnlyShader.Tests.Editor
         }
 
         [Test]
-        public void TextureResolution_4096超の値_4096にクランプされる()
+        public void TextureResolution_8192超の値_8192にクランプされる()
         {
-            _virtualLight.TextureResolution = 8192;
-            Assert.AreEqual(4096, _virtualLight.TextureResolution,
-                "TextureResolutionは4096を超える場合4096にクランプされるべき");
+            _virtualLight.TextureResolution = 16384;
+            Assert.AreEqual(8192, _virtualLight.TextureResolution,
+                "TextureResolutionは8192を超える場合8192にクランプされるべき");
         }
 
         [Test]
@@ -63,10 +63,10 @@ namespace ShadowOnlyShader.Tests.Editor
         }
 
         [Test]
-        public void TextureResolution_上限境界値4096_正しく設定される()
+        public void TextureResolution_上限境界値8192_正しく設定される()
         {
-            _virtualLight.TextureResolution = 4096;
-            Assert.AreEqual(4096, _virtualLight.TextureResolution);
+            _virtualLight.TextureResolution = 8192;
+            Assert.AreEqual(8192, _virtualLight.TextureResolution);
         }
 
         #endregion
