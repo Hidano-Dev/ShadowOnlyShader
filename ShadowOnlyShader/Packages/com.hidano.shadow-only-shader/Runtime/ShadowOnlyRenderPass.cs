@@ -9,8 +9,7 @@ namespace ShadowOnlyShader
     /// <summary>
     /// 影のみ描画用のRenderPass。
     /// RenderGraph UnsafePassおよびレガシーExecuteの両方に対応し、
-    /// キャスターRendererを深度RenderTextureに描画する。
-    /// Requirements: 1.3, 1.4, 5.1, 5.3, 5.4
+    /// キャスターRendererをTexture2DArrayの各スライスに深度描画する。
     /// </summary>
     public class ShadowOnlyRenderPass : ScriptableRenderPass
     {
@@ -26,8 +25,11 @@ namespace ShadowOnlyShader
             /// <summary>Projection行列のリスト（各VirtualLight分）。</summary>
             public List<Matrix4x4> projectionMatrices = new List<Matrix4x4>();
 
-            /// <summary>深度RenderTextureのリスト（各VirtualLight分）。</summary>
-            public List<RenderTexture> depthRenderTextures = new List<RenderTexture>();
+            /// <summary>深度Texture2DArray（全VirtualLight共通）。</summary>
+            public RenderTexture depthArrayTexture;
+
+            /// <summary>描画対象のライト数。</summary>
+            public int lightCount;
 
             /// <summary>キャスターRendererリストのリスト（各VirtualLight分）。</summary>
             public List<List<Renderer>> casterRendererLists = new List<List<Renderer>>();
@@ -47,6 +49,29 @@ namespace ShadowOnlyShader
             /// <summary>カメラのデプスターゲット（RenderGraphパスでのレンダーターゲット復元用）。</summary>
             public RTHandle cameraDepthTarget;
 
+            /// <summary>Rendererリストのプール（GCアロケーション回避）。</summary>
+            private readonly List<List<Renderer>> _rendererListPool = new List<List<Renderer>>();
+            private int _poolUsedCount;
+
+            /// <summary>
+            /// プールからRendererリストを取得する。
+            /// プールが不足している場合は新規作成してプールに追加する。
+            /// </summary>
+            public List<Renderer> GetPooledRendererList()
+            {
+                if (_poolUsedCount < _rendererListPool.Count)
+                {
+                    var list = _rendererListPool[_poolUsedCount];
+                    list.Clear();
+                    _poolUsedCount++;
+                    return list;
+                }
+                var newList = new List<Renderer>();
+                _rendererListPool.Add(newList);
+                _poolUsedCount++;
+                return newList;
+            }
+
             /// <summary>
             /// PassDataの内容をクリアする。
             /// 毎フレームの再利用のために使用する。
@@ -55,8 +80,10 @@ namespace ShadowOnlyShader
             {
                 viewMatrices.Clear();
                 projectionMatrices.Clear();
-                depthRenderTextures.Clear();
+                depthArrayTexture = null;
+                lightCount = 0;
                 casterRendererLists.Clear();
+                _poolUsedCount = 0;
                 depthOnlyMaterial = null;
                 cameraColorTarget = null;
                 cameraDepthTarget = null;
@@ -104,6 +131,7 @@ namespace ShadowOnlyShader
         /// <summary>
         /// VirtualLightからPassDataを収集する共通処理。
         /// RecordRenderGraphとExecuteの両方から使用される。
+        /// LateUpdateで行列計算済みのデータを使用する（重複計算なし）。
         /// </summary>
         /// <param name="passData">データを格納するPassData</param>
         /// <param name="cameraViewMatrix">カメラのView行列</param>
@@ -116,9 +144,17 @@ namespace ShadowOnlyShader
             passData.cameraViewMatrix = cameraViewMatrix;
             passData.cameraProjectionMatrix = cameraProjectionMatrix;
 
-            var virtualLights = _manager.VirtualLights;
+            // ManagerからTexture2DArrayを取得
+            passData.depthArrayTexture = _manager.DepthArrayTexture;
+            if (passData.depthArrayTexture == null)
+            {
+                return false;
+            }
 
-            for (int i = 0; i < virtualLights.Count; i++)
+            var virtualLights = _manager.VirtualLights;
+            int validCount = 0;
+
+            for (int i = 0; i < virtualLights.Count && validCount < 8; i++)
             {
                 var vl = virtualLights[i] as VirtualLight;
                 if (vl == null || !vl.isActiveAndEnabled)
@@ -126,23 +162,12 @@ namespace ShadowOnlyShader
                     continue;
                 }
 
-                // 深度RenderTextureの確認・作成
-                vl.EnsureDepthTexture();
-                var depthRT = vl.DepthRenderTexture;
-                if (depthRT == null)
-                {
-                    continue;
-                }
-
-                // VP行列の更新
-                vl.UpdateMatrices();
-
-                // キャスターRendererの収集
+                // キャスターRendererの収集（dirtyフラグによりキャッシュ済みの場合はスキップ）
                 vl.CollectRenderers();
                 var casterRenderers = vl.CasterRenderers;
 
-                // 有効なRendererのみをフィルタリングしてリストに追加
-                var validRenderers = new List<Renderer>();
+                // 有効なRendererのみをフィルタリングしてプールされたリストに追加
+                var validRenderers = passData.GetPooledRendererList();
                 if (casterRenderers != null)
                 {
                     for (int r = 0; r < casterRenderers.Count; r++)
@@ -158,11 +183,12 @@ namespace ShadowOnlyShader
                 // Rendererが0件でも深度テクスチャのクリアが必要なためスキップしない
                 passData.viewMatrices.Add(vl.ViewMatrix);
                 passData.projectionMatrices.Add(vl.ProjectionMatrix);
-                passData.depthRenderTextures.Add(depthRT);
                 passData.casterRendererLists.Add(validRenderers);
+                validCount++;
             }
 
-            return passData.depthRenderTextures.Count > 0;
+            passData.lightCount = validCount;
+            return validCount > 0;
         }
 
         #endregion
@@ -171,21 +197,21 @@ namespace ShadowOnlyShader
 
         /// <summary>
         /// CommandBufferを使用して深度描画を実行する共通処理。
+        /// Texture2DArrayの各スライスに対してレンダリングする。
         /// RenderGraphパスとレガシーパスの両方から使用される。
         /// </summary>
         /// <param name="cmd">CommandBuffer</param>
         /// <param name="data">PassData</param>
         private static void ExecuteDrawCommands(CommandBuffer cmd, PassData data)
         {
-            for (int lightIndex = 0; lightIndex < data.depthRenderTextures.Count; lightIndex++)
+            for (int lightIndex = 0; lightIndex < data.lightCount; lightIndex++)
             {
-                var depthRT = data.depthRenderTextures[lightIndex];
                 var viewMatrix = data.viewMatrices[lightIndex];
                 var projMatrix = data.projectionMatrices[lightIndex];
                 var casters = data.casterRendererLists[lightIndex];
 
-                // 深度RenderTextureをレンダーターゲットに設定
-                cmd.SetRenderTarget(depthRT);
+                // Texture2DArrayの該当スライスをレンダーターゲットに設定
+                cmd.SetRenderTarget(data.depthArrayTexture, 0, CubemapFace.Unknown, lightIndex);
 
                 // 深度バッファをクリア（深度を最大値=1.0にクリア）
                 cmd.ClearRenderTarget(true, false, Color.clear, 1.0f);
@@ -202,7 +228,7 @@ namespace ShadowOnlyShader
                         continue;
                     }
 
-                    int submeshCount = renderer.sharedMaterials.Length;
+                    int submeshCount = renderer.sharedMaterialCount;
                     for (int s = 0; s < submeshCount; s++)
                     {
                         cmd.DrawRenderer(renderer, data.depthOnlyMaterial, s, 0);
@@ -264,7 +290,7 @@ namespace ShadowOnlyShader
         #region RenderGraphパス (RecordRenderGraph)
 
         /// <summary>
-        /// RenderGraphにUnsafePassを登録し、各VirtualLightの深度テクスチャを生成する。
+        /// RenderGraphにUnsafePassを登録し、Texture2DArrayの各スライスに深度テクスチャを生成する。
         /// AddUnsafePassを使用し、UnsafeGraphContextからCommandBufferを取得して
         /// SetRenderTarget、Clear、SetViewProjectionMatrices、DrawRendererを実行する。
         /// </summary>

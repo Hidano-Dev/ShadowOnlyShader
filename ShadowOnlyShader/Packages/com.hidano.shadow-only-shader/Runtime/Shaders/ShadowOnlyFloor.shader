@@ -52,8 +52,9 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 #define BLUR_KERNEL_RADIUS 0
             #endif
 
-            // --- Uniform変数 ---
-            // ShadowOnlyManagerから毎フレームMaterial.SetXxxで設定される
+            // --- Uniform変数（配列化） ---
+            // ShadowOnlyManagerからSetXxxArrayで一括設定される
+            // 個別のGetXxx()ヘルパー関数は不要（直接配列インデックスでアクセス）
 
             // アクティブな仮想光源数
             int _VirtualLightCount;
@@ -62,174 +63,45 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             float _BlendMultiplier;
 
             // 各仮想光源のVP行列（ワールド空間からライト射影空間への変換）
-            float4x4 _LightVPMatrix_0;
-            float4x4 _LightVPMatrix_1;
-            float4x4 _LightVPMatrix_2;
-            float4x4 _LightVPMatrix_3;
-            float4x4 _LightVPMatrix_4;
-            float4x4 _LightVPMatrix_5;
-            float4x4 _LightVPMatrix_6;
-            float4x4 _LightVPMatrix_7;
+            float4x4 _LightVPMatrices[MAX_VIRTUAL_LIGHTS];
 
-            // 各仮想光源の深度テクスチャ
-            TEXTURE2D(_ShadowDepthTex_0);
-            TEXTURE2D(_ShadowDepthTex_1);
-            TEXTURE2D(_ShadowDepthTex_2);
-            TEXTURE2D(_ShadowDepthTex_3);
-            TEXTURE2D(_ShadowDepthTex_4);
-            TEXTURE2D(_ShadowDepthTex_5);
-            TEXTURE2D(_ShadowDepthTex_6);
-            TEXTURE2D(_ShadowDepthTex_7);
-
-            SAMPLER(sampler_ShadowDepthTex_0);
-            SAMPLER(sampler_ShadowDepthTex_1);
-            SAMPLER(sampler_ShadowDepthTex_2);
-            SAMPLER(sampler_ShadowDepthTex_3);
-            SAMPLER(sampler_ShadowDepthTex_4);
-            SAMPLER(sampler_ShadowDepthTex_5);
-            SAMPLER(sampler_ShadowDepthTex_6);
-            SAMPLER(sampler_ShadowDepthTex_7);
+            // 深度Texture2DArray（全仮想光源共有、スライスインデックスでアクセス）
+            TEXTURE2D_ARRAY(_ShadowDepthTexArray);
+            SAMPLER(sampler_ShadowDepthTexArray);
 
             // 各仮想光源の影の色（RGBAのうちRGBを使用）
-            float4 _ShadowColor_0;
-            float4 _ShadowColor_1;
-            float4 _ShadowColor_2;
-            float4 _ShadowColor_3;
-            float4 _ShadowColor_4;
-            float4 _ShadowColor_5;
-            float4 _ShadowColor_6;
-            float4 _ShadowColor_7;
+            float4 _ShadowColors[MAX_VIRTUAL_LIGHTS];
 
             // 各仮想光源の影の濃さ（アルファ値）
-            float _ShadowAlpha_0;
-            float _ShadowAlpha_1;
-            float _ShadowAlpha_2;
-            float _ShadowAlpha_3;
-            float _ShadowAlpha_4;
-            float _ShadowAlpha_5;
-            float _ShadowAlpha_6;
-            float _ShadowAlpha_7;
+            float _ShadowAlphas[MAX_VIRTUAL_LIGHTS];
 
             // 各仮想光源の深度バイアス
-            float _DepthBias_0;
-            float _DepthBias_1;
-            float _DepthBias_2;
-            float _DepthBias_3;
-            float _DepthBias_4;
-            float _DepthBias_5;
-            float _DepthBias_6;
-            float _DepthBias_7;
+            float _DepthBiases[MAX_VIRTUAL_LIGHTS];
 
             // ブラー関連パラメータ
-            float _BlurRadius_0;
-            float _BlurRadius_1;
-            float _BlurRadius_2;
-            float _BlurRadius_3;
-            float _BlurRadius_4;
-            float _BlurRadius_5;
-            float _BlurRadius_6;
-            float _BlurRadius_7;
-
-            float _BlurDistanceFactor_0;
-            float _BlurDistanceFactor_1;
-            float _BlurDistanceFactor_2;
-            float _BlurDistanceFactor_3;
-            float _BlurDistanceFactor_4;
-            float _BlurDistanceFactor_5;
-            float _BlurDistanceFactor_6;
-            float _BlurDistanceFactor_7;
-
-            // カメラ距離ボケ係数
-            float _BlurCameraDistanceFactor_0;
-            float _BlurCameraDistanceFactor_1;
-            float _BlurCameraDistanceFactor_2;
-            float _BlurCameraDistanceFactor_3;
-            float _BlurCameraDistanceFactor_4;
-            float _BlurCameraDistanceFactor_5;
-            float _BlurCameraDistanceFactor_6;
-            float _BlurCameraDistanceFactor_7;
-
-            // カメラ距離べき乗指数
-            float _CameraDistancePower_0;
-            float _CameraDistancePower_1;
-            float _CameraDistancePower_2;
-            float _CameraDistancePower_3;
-            float _CameraDistancePower_4;
-            float _CameraDistancePower_5;
-            float _CameraDistancePower_6;
-            float _CameraDistancePower_7;
-
-            // カメラ距離アルファ減衰係数
-            float _AlphaCameraDistanceFactor_0;
-            float _AlphaCameraDistanceFactor_1;
-            float _AlphaCameraDistanceFactor_2;
-            float _AlphaCameraDistanceFactor_3;
-            float _AlphaCameraDistanceFactor_4;
-            float _AlphaCameraDistanceFactor_5;
-            float _AlphaCameraDistanceFactor_6;
-            float _AlphaCameraDistanceFactor_7;
+            float _BlurRadii[MAX_VIRTUAL_LIGHTS];
+            float _BlurDistanceFactors[MAX_VIRTUAL_LIGHTS];
+            float _BlurCameraDistanceFactors[MAX_VIRTUAL_LIGHTS];
+            float _CameraDistancePowers[MAX_VIRTUAL_LIGHTS];
+            float _AlphaCameraDistanceFactors[MAX_VIRTUAL_LIGHTS];
 
             // Hue Shift（度数 0-360）
-            float _HueShift_0;
-            float _HueShift_1;
-            float _HueShift_2;
-            float _HueShift_3;
-            float _HueShift_4;
-            float _HueShift_5;
-            float _HueShift_6;
-            float _HueShift_7;
+            float _HueShifts[MAX_VIRTUAL_LIGHTS];
 
             // 色収差強度
-            float _ChromaticAberration_0;
-            float _ChromaticAberration_1;
-            float _ChromaticAberration_2;
-            float _ChromaticAberration_3;
-            float _ChromaticAberration_4;
-            float _ChromaticAberration_5;
-            float _ChromaticAberration_6;
-            float _ChromaticAberration_7;
+            float _ChromaticAberrations[MAX_VIRTUAL_LIGHTS];
 
             // 色収差の光源色（スペクトル重み変調用）
-            // 光源の色に応じてRGB各波長帯の寄与率を変化させる
-            // 白(1,1,1)=標準CA、単色光=CAなし（物理的に正しい挙動）
-            float4 _ChromaticAberrationColor_0;
-            float4 _ChromaticAberrationColor_1;
-            float4 _ChromaticAberrationColor_2;
-            float4 _ChromaticAberrationColor_3;
-            float4 _ChromaticAberrationColor_4;
-            float4 _ChromaticAberrationColor_5;
-            float4 _ChromaticAberrationColor_6;
-            float4 _ChromaticAberrationColor_7;
+            float4 _ChromaticAberrationColors[MAX_VIRTUAL_LIGHTS];
 
             // コンタクトハードニング（PCSS）強度
-            float _ContactHardeningStrength_0;
-            float _ContactHardeningStrength_1;
-            float _ContactHardeningStrength_2;
-            float _ContactHardeningStrength_3;
-            float _ContactHardeningStrength_4;
-            float _ContactHardeningStrength_5;
-            float _ContactHardeningStrength_6;
-            float _ContactHardeningStrength_7;
+            float _ContactHardeningStrengths[MAX_VIRTUAL_LIGHTS];
 
             // 各仮想光源のワールド位置（距離ボケ計算用）
-            float4 _LightWorldPos_0;
-            float4 _LightWorldPos_1;
-            float4 _LightWorldPos_2;
-            float4 _LightWorldPos_3;
-            float4 _LightWorldPos_4;
-            float4 _LightWorldPos_5;
-            float4 _LightWorldPos_6;
-            float4 _LightWorldPos_7;
+            float4 _LightWorldPositions[MAX_VIRTUAL_LIGHTS];
 
             // 各仮想光源の深度テクスチャサイズ (width, height, 1/width, 1/height)
-            float4 _DepthTexSize_0;
-            float4 _DepthTexSize_1;
-            float4 _DepthTexSize_2;
-            float4 _DepthTexSize_3;
-            float4 _DepthTexSize_4;
-            float4 _DepthTexSize_5;
-            float4 _DepthTexSize_6;
-            float4 _DepthTexSize_7;
+            float4 _DepthTexSizes[MAX_VIRTUAL_LIGHTS];
 
             struct Attributes
             {
@@ -250,205 +122,6 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 // ワールド空間からクリップ空間への変換（通常のカメラVP行列）
                 output.positionCS = TransformWorldToHClip(output.positionWS);
                 return output;
-            }
-
-            // ===================================================================
-            // ヘルパー関数: インデックスによるパラメータアクセス
-            // HLSLではuniform配列のインデックスアクセスに制限があるため、
-            // if分岐で各パラメータを個別にアクセスする
-            // ===================================================================
-
-            float4x4 GetLightVPMatrix(int index)
-            {
-                if (index == 0) return _LightVPMatrix_0;
-                if (index == 1) return _LightVPMatrix_1;
-                if (index == 2) return _LightVPMatrix_2;
-                if (index == 3) return _LightVPMatrix_3;
-                if (index == 4) return _LightVPMatrix_4;
-                if (index == 5) return _LightVPMatrix_5;
-                if (index == 6) return _LightVPMatrix_6;
-                return _LightVPMatrix_7;
-            }
-
-            float4 GetShadowColor(int index)
-            {
-                if (index == 0) return _ShadowColor_0;
-                if (index == 1) return _ShadowColor_1;
-                if (index == 2) return _ShadowColor_2;
-                if (index == 3) return _ShadowColor_3;
-                if (index == 4) return _ShadowColor_4;
-                if (index == 5) return _ShadowColor_5;
-                if (index == 6) return _ShadowColor_6;
-                return _ShadowColor_7;
-            }
-
-            float GetShadowAlpha(int index)
-            {
-                if (index == 0) return _ShadowAlpha_0;
-                if (index == 1) return _ShadowAlpha_1;
-                if (index == 2) return _ShadowAlpha_2;
-                if (index == 3) return _ShadowAlpha_3;
-                if (index == 4) return _ShadowAlpha_4;
-                if (index == 5) return _ShadowAlpha_5;
-                if (index == 6) return _ShadowAlpha_6;
-                return _ShadowAlpha_7;
-            }
-
-            float GetDepthBias(int index)
-            {
-                if (index == 0) return _DepthBias_0;
-                if (index == 1) return _DepthBias_1;
-                if (index == 2) return _DepthBias_2;
-                if (index == 3) return _DepthBias_3;
-                if (index == 4) return _DepthBias_4;
-                if (index == 5) return _DepthBias_5;
-                if (index == 6) return _DepthBias_6;
-                return _DepthBias_7;
-            }
-
-            float GetBlurRadius(int index)
-            {
-                if (index == 0) return _BlurRadius_0;
-                if (index == 1) return _BlurRadius_1;
-                if (index == 2) return _BlurRadius_2;
-                if (index == 3) return _BlurRadius_3;
-                if (index == 4) return _BlurRadius_4;
-                if (index == 5) return _BlurRadius_5;
-                if (index == 6) return _BlurRadius_6;
-                return _BlurRadius_7;
-            }
-
-            float GetBlurDistanceFactor(int index)
-            {
-                if (index == 0) return _BlurDistanceFactor_0;
-                if (index == 1) return _BlurDistanceFactor_1;
-                if (index == 2) return _BlurDistanceFactor_2;
-                if (index == 3) return _BlurDistanceFactor_3;
-                if (index == 4) return _BlurDistanceFactor_4;
-                if (index == 5) return _BlurDistanceFactor_5;
-                if (index == 6) return _BlurDistanceFactor_6;
-                return _BlurDistanceFactor_7;
-            }
-
-            float GetBlurCameraDistanceFactor(int index)
-            {
-                if (index == 0) return _BlurCameraDistanceFactor_0;
-                if (index == 1) return _BlurCameraDistanceFactor_1;
-                if (index == 2) return _BlurCameraDistanceFactor_2;
-                if (index == 3) return _BlurCameraDistanceFactor_3;
-                if (index == 4) return _BlurCameraDistanceFactor_4;
-                if (index == 5) return _BlurCameraDistanceFactor_5;
-                if (index == 6) return _BlurCameraDistanceFactor_6;
-                return _BlurCameraDistanceFactor_7;
-            }
-
-            float GetAlphaCameraDistanceFactor(int index)
-            {
-                if (index == 0) return _AlphaCameraDistanceFactor_0;
-                if (index == 1) return _AlphaCameraDistanceFactor_1;
-                if (index == 2) return _AlphaCameraDistanceFactor_2;
-                if (index == 3) return _AlphaCameraDistanceFactor_3;
-                if (index == 4) return _AlphaCameraDistanceFactor_4;
-                if (index == 5) return _AlphaCameraDistanceFactor_5;
-                if (index == 6) return _AlphaCameraDistanceFactor_6;
-                return _AlphaCameraDistanceFactor_7;
-            }
-
-            float GetCameraDistancePower(int index)
-            {
-                if (index == 0) return _CameraDistancePower_0;
-                if (index == 1) return _CameraDistancePower_1;
-                if (index == 2) return _CameraDistancePower_2;
-                if (index == 3) return _CameraDistancePower_3;
-                if (index == 4) return _CameraDistancePower_4;
-                if (index == 5) return _CameraDistancePower_5;
-                if (index == 6) return _CameraDistancePower_6;
-                return _CameraDistancePower_7;
-            }
-
-            float GetHueShift(int index)
-            {
-                if (index == 0) return _HueShift_0;
-                if (index == 1) return _HueShift_1;
-                if (index == 2) return _HueShift_2;
-                if (index == 3) return _HueShift_3;
-                if (index == 4) return _HueShift_4;
-                if (index == 5) return _HueShift_5;
-                if (index == 6) return _HueShift_6;
-                return _HueShift_7;
-            }
-
-            float GetChromaticAberration(int index)
-            {
-                if (index == 0) return _ChromaticAberration_0;
-                if (index == 1) return _ChromaticAberration_1;
-                if (index == 2) return _ChromaticAberration_2;
-                if (index == 3) return _ChromaticAberration_3;
-                if (index == 4) return _ChromaticAberration_4;
-                if (index == 5) return _ChromaticAberration_5;
-                if (index == 6) return _ChromaticAberration_6;
-                return _ChromaticAberration_7;
-            }
-
-            float4 GetChromaticAberrationColor(int index)
-            {
-                if (index == 0) return _ChromaticAberrationColor_0;
-                if (index == 1) return _ChromaticAberrationColor_1;
-                if (index == 2) return _ChromaticAberrationColor_2;
-                if (index == 3) return _ChromaticAberrationColor_3;
-                if (index == 4) return _ChromaticAberrationColor_4;
-                if (index == 5) return _ChromaticAberrationColor_5;
-                if (index == 6) return _ChromaticAberrationColor_6;
-                return _ChromaticAberrationColor_7;
-            }
-
-            float4 GetLightWorldPos(int index)
-            {
-                if (index == 0) return _LightWorldPos_0;
-                if (index == 1) return _LightWorldPos_1;
-                if (index == 2) return _LightWorldPos_2;
-                if (index == 3) return _LightWorldPos_3;
-                if (index == 4) return _LightWorldPos_4;
-                if (index == 5) return _LightWorldPos_5;
-                if (index == 6) return _LightWorldPos_6;
-                return _LightWorldPos_7;
-            }
-
-            float GetContactHardeningStrength(int index)
-            {
-                if (index == 0) return _ContactHardeningStrength_0;
-                if (index == 1) return _ContactHardeningStrength_1;
-                if (index == 2) return _ContactHardeningStrength_2;
-                if (index == 3) return _ContactHardeningStrength_3;
-                if (index == 4) return _ContactHardeningStrength_4;
-                if (index == 5) return _ContactHardeningStrength_5;
-                if (index == 6) return _ContactHardeningStrength_6;
-                return _ContactHardeningStrength_7;
-            }
-
-            float4 GetDepthTexSize(int index)
-            {
-                if (index == 0) return _DepthTexSize_0;
-                if (index == 1) return _DepthTexSize_1;
-                if (index == 2) return _DepthTexSize_2;
-                if (index == 3) return _DepthTexSize_3;
-                if (index == 4) return _DepthTexSize_4;
-                if (index == 5) return _DepthTexSize_5;
-                if (index == 6) return _DepthTexSize_6;
-                return _DepthTexSize_7;
-            }
-
-            // 深度テクスチャのサンプリング（インデックスアクセス）
-            float SampleShadowDepth(int index, float2 uv)
-            {
-                if (index == 0) return SAMPLE_TEXTURE2D(_ShadowDepthTex_0, sampler_ShadowDepthTex_0, uv).r;
-                if (index == 1) return SAMPLE_TEXTURE2D(_ShadowDepthTex_1, sampler_ShadowDepthTex_1, uv).r;
-                if (index == 2) return SAMPLE_TEXTURE2D(_ShadowDepthTex_2, sampler_ShadowDepthTex_2, uv).r;
-                if (index == 3) return SAMPLE_TEXTURE2D(_ShadowDepthTex_3, sampler_ShadowDepthTex_3, uv).r;
-                if (index == 4) return SAMPLE_TEXTURE2D(_ShadowDepthTex_4, sampler_ShadowDepthTex_4, uv).r;
-                if (index == 5) return SAMPLE_TEXTURE2D(_ShadowDepthTex_5, sampler_ShadowDepthTex_5, uv).r;
-                if (index == 6) return SAMPLE_TEXTURE2D(_ShadowDepthTex_6, sampler_ShadowDepthTex_6, uv).r;
-                return SAMPLE_TEXTURE2D(_ShadowDepthTex_7, sampler_ShadowDepthTex_7, uv).r;
             }
 
             // ===================================================================
@@ -552,7 +225,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                             continue;
                         }
 
-                        float sampledDepth = SampleShadowDepth(lightIndex, sampleUV);
+                        float sampledDepth = SAMPLE_TEXTURE2D_ARRAY(_ShadowDepthTexArray, sampler_ShadowDepthTexArray, sampleUV, lightIndex).r;
 
                         // ブロッカー判定: フラグメントより手前にある深度値を収集
                         #if UNITY_REVERSED_Z
@@ -587,7 +260,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
 
             float ComputeShadowAtUV(int lightIndex, float2 shadowUV, float fragmentDepth, float bias)
             {
-                float sampledDepth = SampleShadowDepth(lightIndex, shadowUV);
+                float sampledDepth = SAMPLE_TEXTURE2D_ARRAY(_ShadowDepthTexArray, sampler_ShadowDepthTexArray, shadowUV, lightIndex).r;
                 float shadow = 0.0;
 
                 #if UNITY_REVERSED_Z
@@ -610,7 +283,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
             {
                 // ワールド位置をライト射影空間に変換
-                float4x4 lightVP = GetLightVPMatrix(lightIndex);
+                float4x4 lightVP = _LightVPMatrices[lightIndex];
                 float4 positionLS = mul(lightVP, float4(positionWS, 1.0));
 
                 // 射影空間の背面（カメラの後ろ）にあるフラグメントは影なし
@@ -652,7 +325,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                     fragmentDepth = fragmentDepth * 0.5 + 0.5;
                 #endif
 
-                float bias = GetDepthBias(lightIndex);
+                float bias = _DepthBiases[lightIndex];
 
                 // Perspective投影では深度が非線形（depth ≈ near/d）のため、
                 // NDC空間での深度差がw²に反比例して縮小する。
@@ -665,7 +338,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                     return ComputeShadowAtUV(lightIndex, shadowUV, fragmentDepth, bias);
                 #else
                     // テクセルサイズの取得
-                    float4 texSize = GetDepthTexSize(lightIndex);
+                    float4 texSize = _DepthTexSizes[lightIndex];
                     float2 texelSize = texSize.zw; // (1/width, 1/height)
 
                     // テクセルサイズが0の場合のフォールバック（安全策）
@@ -675,33 +348,33 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                     }
 
                     // ガウシアンサンプリングブラー
-                    float blurRadius = GetBlurRadius(lightIndex);
+                    float blurRadius = _BlurRadii[lightIndex];
 
                     // 距離ボケ: 光源からの距離に応じたブラー半径の動的変化
-                    float blurDistanceFactor = GetBlurDistanceFactor(lightIndex);
+                    float blurDistanceFactor = _BlurDistanceFactors[lightIndex];
                     if (blurDistanceFactor > 0.0)
                     {
-                        float3 lightPos = GetLightWorldPos(lightIndex).xyz;
+                        float3 lightPos = _LightWorldPositions[lightIndex].xyz;
                         float dist = length(positionWS - lightPos);
                         // 距離に比例してブラー半径を増加させる
                         blurRadius *= (1.0 + dist * blurDistanceFactor);
                     }
 
                     // カメラ距離ボケ: カメラからの距離に応じたブラー半径の動的変化
-                    float blurCameraDistanceFactor = GetBlurCameraDistanceFactor(lightIndex);
+                    float blurCameraDistanceFactor = _BlurCameraDistanceFactors[lightIndex];
                     if (blurCameraDistanceFactor > 0.0)
                     {
                         float3 cameraPos = GetCameraPositionWS();
                         float cameraDist = length(positionWS - cameraPos);
                         // べき乗で距離カーブを調整（power=1:線形, >1:遠方で急激, <1:近くから効く）
-                        float cameraDistPower = GetCameraDistancePower(lightIndex);
+                        float cameraDistPower = _CameraDistancePowers[lightIndex];
                         float scaledDist = pow(max(cameraDist, 0.001), cameraDistPower);
                         blurRadius *= (1.0 + scaledDist * blurCameraDistanceFactor);
                     }
 
                     // PCSS: コンタクトハードニング
                     // キャスターとレシーバーの深度差に基づくブラー半径の動的変化
-                    float contactHardening = GetContactHardeningStrength(lightIndex);
+                    float contactHardening = _ContactHardeningStrengths[lightIndex];
                     if (contactHardening > 0.0)
                     {
                         // ブロッカーサーチ: 検索半径はベースブラー半径を使用
@@ -791,7 +464,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             float3 ComputeShadowWithChromaticAberration(int lightIndex, float3 positionWS, float aberrationStrength)
             {
                 // ライト射影空間でのUV方向を計算
-                float4x4 lightVP = GetLightVPMatrix(lightIndex);
+                float4x4 lightVP = _LightVPMatrices[lightIndex];
                 float4 posLS = mul(lightVP, float4(positionWS, 1.0));
 
                 if (posLS.w <= 0.0)
@@ -875,7 +548,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                 [loop] for (int i = 0; i < lightCount; i++)
                 {
                     // 色収差の有無で影サンプリング方法を切り替え
-                    float chromaticAberration = GetChromaticAberration(i);
+                    float chromaticAberration = _ChromaticAberrations[i];
                     float3 shadowRGB;
 
                     if (chromaticAberration > 0.001)
@@ -889,7 +562,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                         // - 白色光(1,1,1): lerp(x, x, 1) = x → 変化なし（後方互換）
                         // - 単色赤(1,0,0): G,BがRの値に収束 → 全チャンネル同値 = CAなし
                         // - 暖色(1,0.8,0.3): 青フリンジ減弱、赤フリンジ維持
-                        float4 caColor = GetChromaticAberrationColor(i);
+                        float4 caColor = _ChromaticAberrationColors[i];
                         float caColorSum = caColor.r + caColor.g + caColor.b;
                         if (caColorSum > 0.001)
                         {
@@ -912,17 +585,17 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                     if (shadow > 0.0)
                     {
                         // 影の色と濃さを取得
-                        float4 shadowColor = GetShadowColor(i);
-                        float shadowAlpha = GetShadowAlpha(i);
+                        float4 shadowColor = _ShadowColors[i];
+                        float shadowAlpha = _ShadowAlphas[i];
 
                         // カメラ距離アルファ減衰: カメラから遠いほど影が薄くなる
-                        float alphaCameraDistanceFactor = GetAlphaCameraDistanceFactor(i);
+                        float alphaCameraDistanceFactor = _AlphaCameraDistanceFactors[i];
                         if (alphaCameraDistanceFactor > 0.0)
                         {
                             float3 cameraPos = GetCameraPositionWS();
                             float cameraDist = length(input.positionWS - cameraPos);
                             // べき乗で距離カーブを調整
-                            float cameraDistPower = GetCameraDistancePower(i);
+                            float cameraDistPower = _CameraDistancePowers[i];
                             float scaledDist = pow(max(cameraDist, 0.001), cameraDistPower);
                             shadowAlpha *= saturate(1.0 / (1.0 + scaledDist * alphaCameraDistanceFactor));
                         }
@@ -930,7 +603,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
                         float3 finalColor = shadowColor.rgb;
 
                         // Hue Shift適用（HSV色空間での色相回転）
-                        float hueShift = GetHueShift(i);
+                        float hueShift = _HueShifts[i];
                         finalColor = ApplyHueShift(finalColor, hueShift);
 
                         // 色収差フリンジ処理

@@ -5,7 +5,8 @@ namespace ShadowOnlyShader
 {
     /// <summary>
     /// 仮想光源の公開インターフェース。
-    /// 投影パラメータ、影の外観パラメータ、VP行列計算、深度RenderTexture管理を提供する。
+    /// 投影パラメータ、影の外観パラメータ、VP行列計算を提供する。
+    /// 深度テクスチャはShadowOnlyManagerがTexture2DArrayとして一元管理する。
     /// </summary>
     public interface IVirtualLight
     {
@@ -153,12 +154,8 @@ namespace ShadowOnlyShader
         Matrix4x4 ViewProjectionMatrix { get; }
 
         /// <summary>
-        /// 深度RenderTexture（読み取り専用）。仮想光源ごとに管理される。
-        /// </summary>
-        RenderTexture DepthRenderTexture { get; }
-
-        /// <summary>
         /// CasterRoot配下の全Rendererを再収集する。
+        /// dirtyフラグが立っている場合のみ実行される。
         /// </summary>
         void CollectRenderers();
 
@@ -166,11 +163,5 @@ namespace ShadowOnlyShader
         /// View行列とProjection行列を現在のTransformとパラメータから再計算する。
         /// </summary>
         void UpdateMatrices();
-
-        /// <summary>
-        /// 深度RenderTextureの存在と解像度を確認し、必要に応じて作成・再作成する。
-        /// 解像度が変更された場合は古いRenderTextureを破棄して新しく作成する。
-        /// </summary>
-        void EnsureDepthTexture();
     }
 }

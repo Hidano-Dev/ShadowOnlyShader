@@ -109,105 +109,63 @@ namespace ShadowOnlyShader.Tests.Editor
 
         #endregion
 
-        #region VirtualLight 深度RenderTexture ライフサイクル
+        #region 深度Texture2DArray ライフサイクル
 
         [Test]
-        public void VirtualLight_OnEnable_DepthRenderTextureが作成される()
+        public void Manager_OnEnable_DepthArrayTextureが作成される()
         {
             // Arrange & Act
-            var go = new GameObject("TestVirtualLight");
-            var vl = go.AddComponent<VirtualLight>();
+            var go = new GameObject("TestManager");
+            var manager = go.AddComponent<ShadowOnlyManager>();
 
-            // Assert: OnEnableで深度テクスチャが作成される
-            Assert.IsNotNull(vl.DepthRenderTexture,
-                "OnEnableでDepthRenderTextureが作成されるべき");
+            // Assert: OnEnableで深度Texture2DArrayが作成される
+            Assert.IsNotNull(manager.DepthArrayTexture,
+                "OnEnableでDepthArrayTextureが作成されるべき");
+            Assert.AreEqual(UnityEngine.Rendering.TextureDimension.Tex2DArray,
+                manager.DepthArrayTexture.dimension,
+                "DepthArrayTextureはTexture2DArrayであるべき");
+            Assert.AreEqual(ShadowOnlyManager.MaxVirtualLights,
+                manager.DepthArrayTexture.volumeDepth,
+                "DepthArrayTextureのスライス数はMaxVirtualLightsであるべき");
 
             // Cleanup
             Object.DestroyImmediate(go);
         }
 
         [Test]
-        public void VirtualLight_DepthRenderTexture_HideFlagsDontSaveが設定される()
+        public void Manager_DepthArrayTexture_HideFlagsDontSaveが設定される()
         {
             // Arrange & Act
-            var go = new GameObject("TestVirtualLight");
-            var vl = go.AddComponent<VirtualLight>();
+            var go = new GameObject("TestManager");
+            var manager = go.AddComponent<ShadowOnlyManager>();
 
             // Assert
-            Assert.IsNotNull(vl.DepthRenderTexture);
+            Assert.IsNotNull(manager.DepthArrayTexture);
             Assert.IsTrue(
-                (vl.DepthRenderTexture.hideFlags & HideFlags.DontSave) != 0,
-                "DepthRenderTextureにはHideFlags.DontSaveが設定されるべき");
+                (manager.DepthArrayTexture.hideFlags & HideFlags.DontSave) != 0,
+                "DepthArrayTextureにはHideFlags.DontSaveが設定されるべき");
 
             // Cleanup
             Object.DestroyImmediate(go);
         }
 
         [Test]
-        public void VirtualLight_OnDisable_DepthRenderTextureが破棄される()
+        public void Manager_OnDisable_DepthArrayTextureが破棄される()
         {
             // Arrange
-            var go = new GameObject("TestVirtualLight");
-            var vl = go.AddComponent<VirtualLight>();
-            var rtRef = vl.DepthRenderTexture;
+            var go = new GameObject("TestManager");
+            var manager = go.AddComponent<ShadowOnlyManager>();
+            var rtRef = manager.DepthArrayTexture;
             Assert.IsNotNull(rtRef);
 
             // Act
             go.SetActive(false);
 
             // Assert
-            Assert.IsNull(vl.DepthRenderTexture,
-                "OnDisableでDepthRenderTextureが破棄されるべき");
+            Assert.IsNull(manager.DepthArrayTexture,
+                "OnDisableでDepthArrayTextureが破棄されるべき");
             Assert.IsTrue(rtRef == null,
                 "破棄されたRenderTextureはUnityのnullチェックでtrueを返すべき");
-
-            // Cleanup
-            Object.DestroyImmediate(go);
-        }
-
-        [Test]
-        public void VirtualLight_EnsureDepthTexture_解像度変更時に再作成される()
-        {
-            // Arrange
-            var go = new GameObject("TestVirtualLight");
-            var vl = go.AddComponent<VirtualLight>();
-            vl.TextureResolution = 512;
-            vl.EnsureDepthTexture();
-            var firstRT = vl.DepthRenderTexture;
-            Assert.AreEqual(512, firstRT.width);
-
-            // Act: 解像度を変更して再作成
-            vl.TextureResolution = 1024;
-            vl.EnsureDepthTexture();
-
-            // Assert
-            Assert.IsNotNull(vl.DepthRenderTexture);
-            Assert.AreEqual(1024, vl.DepthRenderTexture.width,
-                "解像度変更後のRenderTextureは新しい解像度であるべき");
-            // 古いRTは破棄されている
-            Assert.IsTrue(firstRT == null,
-                "古いRenderTextureは破棄されるべき");
-
-            // Cleanup
-            Object.DestroyImmediate(go);
-        }
-
-        [Test]
-        public void VirtualLight_EnsureDepthTexture_同じ解像度では再作成されない()
-        {
-            // Arrange
-            var go = new GameObject("TestVirtualLight");
-            var vl = go.AddComponent<VirtualLight>();
-            vl.TextureResolution = 512;
-            vl.EnsureDepthTexture();
-            var firstRT = vl.DepthRenderTexture;
-
-            // Act: 同じ解像度でEnsure
-            vl.EnsureDepthTexture();
-
-            // Assert: 同じインスタンス
-            Assert.AreSame(firstRT, vl.DepthRenderTexture,
-                "同じ解像度ではRenderTextureを再作成すべきでない");
 
             // Cleanup
             Object.DestroyImmediate(go);

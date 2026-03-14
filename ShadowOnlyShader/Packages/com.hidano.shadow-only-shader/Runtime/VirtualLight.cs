@@ -9,6 +9,7 @@ namespace ShadowOnlyShader
     /// 仮想光源コンポーネント。
     /// 投影パラメータの管理、View/Projection/VP行列の計算を行う。
     /// IVirtualLightインターフェースを実装する。
+    /// 深度テクスチャはShadowOnlyManagerがTexture2DArrayとして一元管理する。
     /// </summary>
     public class VirtualLight : MonoBehaviour, IVirtualLight
     {
@@ -154,8 +155,13 @@ namespace ShadowOnlyShader
         private Matrix4x4 _viewMatrix = Matrix4x4.identity;
         private Matrix4x4 _projectionMatrix = Matrix4x4.identity;
         private Matrix4x4 _viewProjectionMatrix = Matrix4x4.identity;
-        private RenderTexture _depthRenderTexture;
         private readonly List<Renderer> _casterRenderers = new List<Renderer>();
+
+        /// <summary>
+        /// Rendererリストの再収集が必要かどうかのフラグ。
+        /// CasterRoot変更、階層変更時にtrueになる。
+        /// </summary>
+        private bool _renderersDirty = true;
 
         /// <summary>
         /// 前フレームの同期状態。ランタイムでのSourceLight着脱検出に使用。
@@ -326,7 +332,11 @@ namespace ShadowOnlyShader
         public GameObject CasterRoot
         {
             get => _casterRoot;
-            set => _casterRoot = value;
+            set
+            {
+                _casterRoot = value;
+                _renderersDirty = true;
+            }
         }
 
         /// <inheritdoc />
@@ -345,9 +355,6 @@ namespace ShadowOnlyShader
         /// <inheritdoc />
         public Matrix4x4 ViewProjectionMatrix => _viewProjectionMatrix;
 
-        /// <inheritdoc />
-        public RenderTexture DepthRenderTexture => _depthRenderTexture;
-
         #endregion
 
         #region IVirtualLight - Methods
@@ -355,11 +362,14 @@ namespace ShadowOnlyShader
         /// <inheritdoc />
         public void CollectRenderers()
         {
+            if (!_renderersDirty) return;
+
             _casterRenderers.Clear();
             if (_casterRoot != null)
             {
                 _casterRoot.GetComponentsInChildren<Renderer>(_casterRenderers);
             }
+            _renderersDirty = false;
         }
 
         /// <inheritdoc />
@@ -368,27 +378,6 @@ namespace ShadowOnlyShader
             _viewMatrix = CalculateViewMatrix();
             _projectionMatrix = CalculateProjectionMatrix();
             _viewProjectionMatrix = _projectionMatrix * _viewMatrix;
-        }
-
-        /// <summary>
-        /// 深度RenderTextureの存在と解像度を確認し、必要に応じて作成・再作成する。
-        /// 解像度が変更された場合は古いRenderTextureを破棄して新しく作成する。
-        /// </summary>
-        public void EnsureDepthTexture()
-        {
-            int resolution = ResolveTextureResolution();
-
-            // 既存のRenderTextureが存在し、解像度が一致する場合はそのまま
-            if (_depthRenderTexture != null && _depthRenderTexture.width == resolution)
-            {
-                return;
-            }
-
-            // 古いRenderTextureが存在する場合は破棄
-            ReleaseDepthTexture();
-
-            // 新しいRenderTextureを作成
-            _depthRenderTexture = CreateDepthRenderTexture(resolution);
         }
 
         #endregion
@@ -456,35 +445,6 @@ namespace ShadowOnlyShader
                 // Orthographic projection with 1:1 aspect ratio
                 float size = _orthographicSize;
                 return Matrix4x4.Ortho(-size, size, -size, size, near, far);
-            }
-        }
-
-        #endregion
-
-        #region Depth RenderTexture Management
-
-        /// <summary>
-        /// 指定解像度で深度RenderTextureを作成する。
-        /// HideFlags.DontSaveを設定し、シーン保存時に永続化しない。
-        /// </summary>
-        private RenderTexture CreateDepthRenderTexture(int resolution)
-        {
-            var rt = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.Depth);
-            rt.hideFlags = HideFlags.DontSave;
-            rt.Create();
-            return rt;
-        }
-
-        /// <summary>
-        /// 深度RenderTextureを解放する。
-        /// </summary>
-        private void ReleaseDepthTexture()
-        {
-            if (_depthRenderTexture != null)
-            {
-                _depthRenderTexture.Release();
-                DestroyImmediate(_depthRenderTexture);
-                _depthRenderTexture = null;
             }
         }
 
@@ -576,23 +536,9 @@ namespace ShadowOnlyShader
 
         private void OnEnable()
         {
-            // 深度RenderTextureの作成
-            EnsureDepthTexture();
-
             // CasterRoot配下のRendererを自動収集
+            _renderersDirty = true;
             CollectRenderers();
-        }
-
-        private void OnDisable()
-        {
-            // 深度RenderTextureの破棄
-            ReleaseDepthTexture();
-        }
-
-        private void OnDestroy()
-        {
-            // OnDisableが呼ばれない場合の安全策として、OnDestroyでも破棄を行う
-            ReleaseDepthTexture();
         }
 
         private void OnValidate()
@@ -615,6 +561,9 @@ namespace ShadowOnlyShader
             _hueShift = Mathf.Clamp(_hueShift, 0f, 360f);
             _chromaticAberration = Mathf.Max(_chromaticAberration, 0f);
             _contactHardeningStrength = Mathf.Max(_contactHardeningStrength, 0f);
+
+            // Inspector変更時にRendererリストを再収集対象にする
+            _renderersDirty = true;
         }
 
         private void LateUpdate()
@@ -636,6 +585,12 @@ namespace ShadowOnlyShader
 
             SyncFromSourceLight();
             UpdateMatrices();
+        }
+
+        private void OnTransformChildrenChanged()
+        {
+            // CasterRoot配下の子階層が変更された場合にRendererリストを再収集
+            _renderersDirty = true;
         }
 
         #endregion

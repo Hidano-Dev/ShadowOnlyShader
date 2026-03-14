@@ -1,15 +1,21 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace ShadowOnlyShader
 {
     /// <summary>
     /// 影のみ描画システムのマネージャーコンポーネント。
     /// 仮想光源・床面Renderer・グローバルパラメータを一元管理する。
+    /// 深度テクスチャはTexture2DArrayとして一元管理し、全VirtualLightで共有する。
     /// IShadowOnlyManagerインターフェースを実装する。
     /// </summary>
     public class ShadowOnlyManager : MonoBehaviour, IShadowOnlyManager
     {
+        /// <summary>仮想光源の最大数。</summary>
+        internal const int MaxVirtualLights = 8;
+
         #region Serialized Fields
 
         [Header("グローバルパラメータ")]
@@ -46,9 +52,40 @@ namespace ShadowOnlyShader
         private Material _floorMaterial;
 
         /// <summary>
+        /// 全VirtualLight共有の深度Texture2DArray。
+        /// </summary>
+        private RenderTexture _depthArrayTexture;
+
+        /// <summary>
+        /// 床面Material割り当てが必要かどうかのフラグ。
+        /// Material作成時・FloorRenderer追加時にtrueになる。
+        /// </summary>
+        private bool _floorMaterialDirty;
+
+        /// <summary>
         /// 複数Manager警告の重複表示を防ぐフラグ。
         /// </summary>
         private bool _warnedMultipleManagers;
+
+        #endregion
+
+        #region Pre-allocated Arrays for SetXxxArray
+
+        private readonly Matrix4x4[] _lightVPMatrices = new Matrix4x4[MaxVirtualLights];
+        private readonly Vector4[] _shadowColors = new Vector4[MaxVirtualLights];
+        private readonly float[] _shadowAlphas = new float[MaxVirtualLights];
+        private readonly float[] _depthBiases = new float[MaxVirtualLights];
+        private readonly float[] _blurRadii = new float[MaxVirtualLights];
+        private readonly float[] _blurDistanceFactors = new float[MaxVirtualLights];
+        private readonly float[] _blurCameraDistanceFactors = new float[MaxVirtualLights];
+        private readonly float[] _cameraDistancePowers = new float[MaxVirtualLights];
+        private readonly float[] _alphaCameraDistanceFactors = new float[MaxVirtualLights];
+        private readonly float[] _hueShifts = new float[MaxVirtualLights];
+        private readonly float[] _chromaticAberrations = new float[MaxVirtualLights];
+        private readonly Vector4[] _chromaticAberrationColors = new Vector4[MaxVirtualLights];
+        private readonly float[] _contactHardeningStrengths = new float[MaxVirtualLights];
+        private readonly Vector4[] _lightWorldPositions = new Vector4[MaxVirtualLights];
+        private readonly Vector4[] _depthTexSizes = new Vector4[MaxVirtualLights];
 
         #endregion
 
@@ -144,6 +181,7 @@ namespace ShadowOnlyShader
             }
 
             _floorRenderers.Add(renderer);
+            _floorMaterialDirty = true;
         }
 
         /// <inheritdoc />
@@ -170,6 +208,81 @@ namespace ShadowOnlyShader
         {
             get => _blendMultiplier;
             set => _blendMultiplier = Mathf.Max(value, 0f);
+        }
+
+        #endregion
+
+        #region 深度Texture2DArray管理
+
+        /// <summary>
+        /// 全VirtualLight共有の深度Texture2DArray。
+        /// RenderPassおよびFloorシェーダーから参照される。
+        /// </summary>
+        public RenderTexture DepthArrayTexture => _depthArrayTexture;
+
+        /// <summary>
+        /// 深度Texture2DArrayの存在と解像度を確認し、必要に応じて作成・再作成する。
+        /// 全VirtualLightの深度テクスチャは統一解像度のTexture2DArrayとして管理される。
+        /// </summary>
+        private void EnsureDepthArrayTexture()
+        {
+            int resolution = ResolveTextureResolution();
+
+            // 既存のTexture2DArrayが存在し、解像度が一致する場合はそのまま
+            if (_depthArrayTexture != null && _depthArrayTexture.width == resolution)
+            {
+                return;
+            }
+
+            // 古いTexture2DArrayを破棄
+            ReleaseDepthArrayTexture();
+
+            // 新しいTexture2DArrayを作成
+            _depthArrayTexture = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.Depth);
+            _depthArrayTexture.dimension = TextureDimension.Tex2DArray;
+            _depthArrayTexture.volumeDepth = MaxVirtualLights;
+            _depthArrayTexture.hideFlags = HideFlags.DontSave;
+            _depthArrayTexture.Create();
+        }
+
+        /// <summary>
+        /// 深度Texture2DArrayを解放する。
+        /// </summary>
+        private void ReleaseDepthArrayTexture()
+        {
+            if (_depthArrayTexture != null)
+            {
+                _depthArrayTexture.Release();
+                DestroyImmediate(_depthArrayTexture);
+                _depthArrayTexture = null;
+            }
+        }
+
+        /// <summary>
+        /// 深度テクスチャの解像度を決定する。
+        /// 最初のアクティブなVirtualLightの解像度設定を使用し、
+        /// 取得できない場合はURP Assetの設定にフォールバックする。
+        /// </summary>
+        private int ResolveTextureResolution()
+        {
+            // 最初のアクティブなVirtualLightの解像度を使用
+            for (int i = 0; i < _virtualLights.Count; i++)
+            {
+                var vl = _virtualLights[i];
+                if (vl != null && vl.isActiveAndEnabled)
+                {
+                    return vl.ResolveTextureResolution();
+                }
+            }
+
+            // フォールバック: URP Asset の設定
+            var urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (urpAsset != null)
+            {
+                return urpAsset.mainLightShadowmapResolution;
+            }
+
+            return 1024;
         }
 
         #endregion
@@ -205,6 +318,7 @@ namespace ShadowOnlyShader
 
             _floorMaterial = new Material(shader);
             _floorMaterial.hideFlags = HideFlags.DontSave;
+            _floorMaterialDirty = true;
         }
 
         /// <summary>
@@ -217,6 +331,8 @@ namespace ShadowOnlyShader
                 DestroyImmediate(_floorMaterial);
                 _floorMaterial = null;
             }
+
+            ReleaseDepthArrayTexture();
         }
 
         #endregion
@@ -224,39 +340,9 @@ namespace ShadowOnlyShader
         #region パラメータ転送
 
         /// <summary>
-        /// シェーダーuniformプロパティ名のキャッシュ。
-        /// インデックス付きのプロパティ名を毎フレーム生成しないためのキャッシュ。
-        /// </summary>
-        private static readonly string[] LightVPMatrixNames = GenerateIndexedNames("_LightVPMatrix_", 8);
-        private static readonly string[] ShadowDepthTexNames = GenerateIndexedNames("_ShadowDepthTex_", 8);
-        private static readonly string[] ShadowColorNames = GenerateIndexedNames("_ShadowColor_", 8);
-        private static readonly string[] ShadowAlphaNames = GenerateIndexedNames("_ShadowAlpha_", 8);
-        private static readonly string[] BlurRadiusNames = GenerateIndexedNames("_BlurRadius_", 8);
-        private static readonly string[] BlurDistanceFactorNames = GenerateIndexedNames("_BlurDistanceFactor_", 8);
-        private static readonly string[] BlurCameraDistanceFactorNames = GenerateIndexedNames("_BlurCameraDistanceFactor_", 8);
-        private static readonly string[] AlphaCameraDistanceFactorNames = GenerateIndexedNames("_AlphaCameraDistanceFactor_", 8);
-        private static readonly string[] CameraDistancePowerNames = GenerateIndexedNames("_CameraDistancePower_", 8);
-        private static readonly string[] HueShiftNames = GenerateIndexedNames("_HueShift_", 8);
-        private static readonly string[] ChromaticAberrationNames = GenerateIndexedNames("_ChromaticAberration_", 8);
-        private static readonly string[] ChromaticAberrationColorNames = GenerateIndexedNames("_ChromaticAberrationColor_", 8);
-        private static readonly string[] DepthBiasNames = GenerateIndexedNames("_DepthBias_", 8);
-        private static readonly string[] ContactHardeningStrengthNames = GenerateIndexedNames("_ContactHardeningStrength_", 8);
-        private static readonly string[] LightWorldPosNames = GenerateIndexedNames("_LightWorldPos_", 8);
-        private static readonly string[] DepthTexSizeNames = GenerateIndexedNames("_DepthTexSize_", 8);
-
-        private static string[] GenerateIndexedNames(string prefix, int count)
-        {
-            var names = new string[count];
-            for (int i = 0; i < count; i++)
-            {
-                names[i] = prefix + i;
-            }
-            return names;
-        }
-
-        /// <summary>
-        /// 各VirtualLightのパラメータを床面MaterialのuniformにMaterial.SetXxxで設定する。
+        /// 各VirtualLightのパラメータを床面MaterialのuniformにSetXxxArrayで一括設定する。
         /// 毎フレームLateUpdateから呼び出され、パラメータ変更がリアルタイムに反映される。
+        /// 配列化により、SetXxx呼び出し数を ~100回/フレーム → ~15回/フレームに削減。
         /// </summary>
         public void UpdateMaterialProperties()
         {
@@ -265,12 +351,12 @@ namespace ShadowOnlyShader
             // グローバルパラメータの設定
             _floorMaterial.SetFloat("_BlendMultiplier", _blendMultiplier);
 
-            // 各VirtualLightのパラメータを転送
+            // 各VirtualLightのパラメータを配列に収集
             // 破棄済みVirtualLightの検出用フラグ
             bool needsRefresh = false;
             int validLightIndex = 0;
 
-            for (int i = 0; i < _virtualLights.Count && validLightIndex < 8; i++)
+            for (int i = 0; i < _virtualLights.Count && validLightIndex < MaxVirtualLights; i++)
             {
                 var vl = _virtualLights[i];
 
@@ -285,56 +371,76 @@ namespace ShadowOnlyShader
                 // GL.GetGPUProjectionMatrixでプラットフォーム固有のProjection行列に変換し、
                 // 深度RenderPassと同じ変換を適用することで深度値の一致を保証する
                 var gpuProj = GL.GetGPUProjectionMatrix(vl.ProjectionMatrix, true);
-                var gpuVP = gpuProj * vl.ViewMatrix;
-                _floorMaterial.SetMatrix(LightVPMatrixNames[validLightIndex], gpuVP);
-
-                // 深度テクスチャ
-                var depthRT = vl.DepthRenderTexture;
-                if (depthRT != null)
-                {
-                    _floorMaterial.SetTexture(ShadowDepthTexNames[validLightIndex], depthRT);
-
-                    // テクスチャサイズ (width, height, 1/width, 1/height)
-                    float w = depthRT.width;
-                    float h = depthRT.height;
-                    _floorMaterial.SetVector(DepthTexSizeNames[validLightIndex], new Vector4(w, h, 1f / w, 1f / h));
-                }
+                _lightVPMatrices[validLightIndex] = gpuProj * vl.ViewMatrix;
 
                 // 影色
-                _floorMaterial.SetColor(ShadowColorNames[validLightIndex], vl.ShadowColor);
+                Color sc = vl.ShadowColor;
+                _shadowColors[validLightIndex] = new Vector4(sc.r, sc.g, sc.b, sc.a);
 
                 // 影の濃さ
-                _floorMaterial.SetFloat(ShadowAlphaNames[validLightIndex], vl.ShadowAlpha);
-
-                // ブラー関連
-                _floorMaterial.SetFloat(BlurRadiusNames[validLightIndex], vl.BlurRadius);
-                _floorMaterial.SetFloat(BlurDistanceFactorNames[validLightIndex], vl.BlurDistanceFactor);
-                _floorMaterial.SetFloat(BlurCameraDistanceFactorNames[validLightIndex], vl.BlurCameraDistanceFactor);
-                _floorMaterial.SetFloat(AlphaCameraDistanceFactorNames[validLightIndex], vl.AlphaCameraDistanceFactor);
-                _floorMaterial.SetFloat(CameraDistancePowerNames[validLightIndex], vl.CameraDistancePower);
-
-                // Hue Shift
-                _floorMaterial.SetFloat(HueShiftNames[validLightIndex], vl.HueShift);
-
-                // 色収差
-                _floorMaterial.SetFloat(ChromaticAberrationNames[validLightIndex], vl.ChromaticAberration);
-                _floorMaterial.SetColor(ChromaticAberrationColorNames[validLightIndex], vl.EffectiveChromaticAberrationColor);
+                _shadowAlphas[validLightIndex] = vl.ShadowAlpha;
 
                 // 深度バイアス
-                _floorMaterial.SetFloat(DepthBiasNames[validLightIndex], vl.DepthBias);
+                _depthBiases[validLightIndex] = vl.DepthBias;
+
+                // ブラー関連
+                _blurRadii[validLightIndex] = vl.BlurRadius;
+                _blurDistanceFactors[validLightIndex] = vl.BlurDistanceFactor;
+                _blurCameraDistanceFactors[validLightIndex] = vl.BlurCameraDistanceFactor;
+                _cameraDistancePowers[validLightIndex] = vl.CameraDistancePower;
+                _alphaCameraDistanceFactors[validLightIndex] = vl.AlphaCameraDistanceFactor;
+
+                // Hue Shift
+                _hueShifts[validLightIndex] = vl.HueShift;
+
+                // 色収差
+                _chromaticAberrations[validLightIndex] = vl.ChromaticAberration;
+                Color caColor = vl.EffectiveChromaticAberrationColor;
+                _chromaticAberrationColors[validLightIndex] = new Vector4(caColor.r, caColor.g, caColor.b, caColor.a);
 
                 // コンタクトハードニング（PCSS）
-                _floorMaterial.SetFloat(ContactHardeningStrengthNames[validLightIndex], vl.ContactHardeningStrength);
+                _contactHardeningStrengths[validLightIndex] = vl.ContactHardeningStrength;
 
                 // 光源ワールド位置（距離ボケ計算用）
                 Vector3 pos = vl.transform.position;
-                _floorMaterial.SetVector(LightWorldPosNames[validLightIndex], new Vector4(pos.x, pos.y, pos.z, 1f));
+                _lightWorldPositions[validLightIndex] = new Vector4(pos.x, pos.y, pos.z, 1f);
+
+                // テクスチャサイズ（全スライス共通解像度）
+                if (_depthArrayTexture != null)
+                {
+                    float w = _depthArrayTexture.width;
+                    float h = _depthArrayTexture.height;
+                    _depthTexSizes[validLightIndex] = new Vector4(w, h, 1f / w, 1f / h);
+                }
 
                 validLightIndex++;
             }
 
             // 実際の有効な光源数を設定（破棄済みを除外した数）
             _floorMaterial.SetInt("_VirtualLightCount", validLightIndex);
+
+            // 配列パラメータを一括設定（SetXxx × 8回 → SetXxxArray × 1回に集約）
+            _floorMaterial.SetMatrixArray("_LightVPMatrices", _lightVPMatrices);
+            _floorMaterial.SetVectorArray("_ShadowColors", _shadowColors);
+            _floorMaterial.SetFloatArray("_ShadowAlphas", _shadowAlphas);
+            _floorMaterial.SetFloatArray("_DepthBiases", _depthBiases);
+            _floorMaterial.SetFloatArray("_BlurRadii", _blurRadii);
+            _floorMaterial.SetFloatArray("_BlurDistanceFactors", _blurDistanceFactors);
+            _floorMaterial.SetFloatArray("_BlurCameraDistanceFactors", _blurCameraDistanceFactors);
+            _floorMaterial.SetFloatArray("_CameraDistancePowers", _cameraDistancePowers);
+            _floorMaterial.SetFloatArray("_AlphaCameraDistanceFactors", _alphaCameraDistanceFactors);
+            _floorMaterial.SetFloatArray("_HueShifts", _hueShifts);
+            _floorMaterial.SetFloatArray("_ChromaticAberrations", _chromaticAberrations);
+            _floorMaterial.SetVectorArray("_ChromaticAberrationColors", _chromaticAberrationColors);
+            _floorMaterial.SetFloatArray("_ContactHardeningStrengths", _contactHardeningStrengths);
+            _floorMaterial.SetVectorArray("_LightWorldPositions", _lightWorldPositions);
+            _floorMaterial.SetVectorArray("_DepthTexSizes", _depthTexSizes);
+
+            // 深度Texture2DArrayを設定
+            if (_depthArrayTexture != null)
+            {
+                _floorMaterial.SetTexture("_ShadowDepthTexArray", _depthArrayTexture);
+            }
 
             // 破棄済みVirtualLightが検出された場合、リストをリフレッシュ
             if (needsRefresh)
@@ -376,18 +482,19 @@ namespace ShadowOnlyShader
 
         /// <summary>
         /// 床面RendererにFloorMaterialを自動割り当てする。
-        /// 登録済みの各FloorRendererのsharedMaterialをFloorMaterialに設定する。
+        /// dirtyフラグが立っている場合のみ実行される（Material作成時・FloorRenderer追加時）。
         /// nullまたは破棄済みのRendererはスキップする。
         /// </summary>
         public void AssignFloorMaterial()
         {
+            if (!_floorMaterialDirty) return;
             if (_floorMaterial == null) return;
 
             for (int i = _floorRenderers.Count - 1; i >= 0; i--)
             {
                 var renderer = _floorRenderers[i];
 
-                // 破棄済みまたはnullのRendererはスキップ（警告は初回のみ出力）
+                // 破棄済みまたはnullのRendererはスキップ
                 if (renderer == null)
                 {
                     continue;
@@ -401,6 +508,8 @@ namespace ShadowOnlyShader
 
                 renderer.sharedMaterial = _floorMaterial;
             }
+
+            _floorMaterialDirty = false;
         }
 
         #endregion
@@ -435,6 +544,9 @@ namespace ShadowOnlyShader
             // 子VirtualLightの収集
             RefreshVirtualLights();
 
+            // 深度Texture2DArrayの作成
+            EnsureDepthArrayTexture();
+
             // 複数Manager警告チェック
             CheckMultipleManagers();
         }
@@ -455,14 +567,18 @@ namespace ShadowOnlyShader
         {
             // シリアライズフィールドのバリデーション
             _blendMultiplier = Mathf.Max(_blendMultiplier, 0f);
+            _floorMaterialDirty = true;
         }
 
         private void LateUpdate()
         {
+            // 深度Texture2DArrayの確認・再作成（解像度変更対応）
+            EnsureDepthArrayTexture();
+
             // 毎フレーム、各VirtualLightのパラメータをMaterialに転送する
             UpdateMaterialProperties();
 
-            // 床面RendererにMaterialを割り当てる
+            // 床面RendererにMaterialを割り当てる（dirtyフラグ制御）
             AssignFloorMaterial();
         }
 
