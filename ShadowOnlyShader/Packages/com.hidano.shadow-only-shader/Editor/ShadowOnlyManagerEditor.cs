@@ -62,6 +62,16 @@ namespace ShadowOnlyShader.Editor
                         Selection.activeGameObject = vl.gameObject;
                     }
 
+                    if (GUILayout.Button("複製", GUILayout.Width(40)))
+                    {
+                        var clone = Instantiate(vl.gameObject, manager.transform);
+                        clone.name = vl.gameObject.name;
+                        Undo.RegisterCreatedObjectUndo(clone, "Duplicate VirtualLight");
+                        manager.RefreshVirtualLights();
+                        Selection.activeGameObject = clone;
+                        GUIUtility.ExitGUI();
+                    }
+
                     if (GUILayout.Button("削除", GUILayout.Width(40)))
                     {
                         Undo.DestroyObjectImmediate(vl.gameObject);
