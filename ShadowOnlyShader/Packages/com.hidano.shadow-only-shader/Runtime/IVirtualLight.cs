@@ -89,16 +89,12 @@ namespace ShadowOnlyShader
         float ChromaticAberration { get; set; }
 
         /// <summary>
-        /// 色収差の光源参照。設定されている場合、このLightの色がスペクトル重みの変調に使用される。
+        /// 参照する Unity Light コンポーネント。
+        /// 設定されている場合、Transform・投影パラメータ・Bias・ShadowAlpha を自動同期し、
+        /// このLightの色がスペクトル重みの変調に使用される。
         /// nullの場合はChromaticAberrationColorがフォールバックとして使用される。
         /// </summary>
         Light SourceLight { get; set; }
-
-        /// <summary>
-        /// SourceLightからTransformと投影パラメータを自動同期するかどうか。
-        /// trueの場合、SourceLightの位置・回転・LightType・SpotAngle・Range等を毎フレーム反映する。
-        /// </summary>
-        bool SyncWithSourceLight { get; set; }
 
         /// <summary>
         /// 色収差のフォールバック光源色。SourceLightが未設定の場合に使用される。

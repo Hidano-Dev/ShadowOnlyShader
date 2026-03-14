@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 
 namespace ShadowOnlyShader
 {
@@ -10,16 +12,18 @@ namespace ShadowOnlyShader
     /// </summary>
     public class VirtualLight : MonoBehaviour, IVirtualLight
     {
+        /// <summary>
+        /// URP Assetの影解像度設定を使用することを示す定数。
+        /// _textureResolutionがこの値の場合、実行時にURPの設定から解像度を取得する。
+        /// </summary>
+        internal const int UseURPResolution = 0;
+
         #region Serialized Fields - Source Light
 
         [Header("Source Light")]
-        [Tooltip("参照する Unity Light コンポーネント。設定すると色収差のフリンジ色が Light の色に連動します。SyncWithSourceLight を有効にすると Transform や投影パラメータも自動同期されます")]
+        [Tooltip("参照する Unity Light コンポーネント。設定すると Transform・投影パラメータ・Bias・ShadowAlpha を自動同期し、色収差のフリンジ色も Light の色に連動します")]
         [SerializeField]
         private Light _sourceLight;
-
-        [Tooltip("有効にすると、SourceLight の Transform（位置・回転）と投影パラメータ（ProjectionMode・FOV・Range・Bias 等）を毎フレーム自動同期します")]
-        [SerializeField]
-        private bool _syncWithSourceLight = false;
 
         [Tooltip("色収差の光源色（SourceLight未設定時のフォールバック）。白=標準的なRGB色収差、単色=色収差なし（物理的に正しい挙動）")]
         [SerializeField]
@@ -127,9 +131,9 @@ namespace ShadowOnlyShader
         private GameObject _casterRoot;
 
         [Header("Quality")]
-        [Tooltip("影の解像度（ピクセル数）。値が大きいほど影がくっきりしますが、処理負荷が増えます。Blur を小さくしてパキッとした影を出す場合は 2048〜4096 を推奨します")]
+        [Tooltip("影の解像度。URP Default は URP Asset の Main Light Shadow Resolution を使用します")]
         [SerializeField]
-        private int _textureResolution = 2048;
+        private int _textureResolution = UseURPResolution;
 
         #endregion
 
@@ -144,6 +148,7 @@ namespace ShadowOnlyShader
         [HideInInspector] [SerializeField] private float _savedFarClipPlane = 100f;
         [HideInInspector] [SerializeField] private float _savedDepthBias;
         [HideInInspector] [SerializeField] private float _savedNormalBias;
+        [HideInInspector] [SerializeField] private float _savedShadowAlpha = 0.5f;
 
         #endregion
 
@@ -156,7 +161,7 @@ namespace ShadowOnlyShader
         private readonly List<Renderer> _casterRenderers = new List<Renderer>();
 
         /// <summary>
-        /// 前フレームの同期状態。ランタイムでのON/OFF遷移検出に使用。
+        /// 前フレームの同期状態。ランタイムでのSourceLight着脱検出に使用。
         /// </summary>
         private bool _wasSyncing;
 
@@ -285,13 +290,6 @@ namespace ShadowOnlyShader
         }
 
         /// <inheritdoc />
-        public bool SyncWithSourceLight
-        {
-            get => _syncWithSourceLight;
-            set => _syncWithSourceLight = value;
-        }
-
-        /// <inheritdoc />
         public Color ChromaticAberrationColor
         {
             get => _chromaticAberrationColor;
@@ -381,7 +379,7 @@ namespace ShadowOnlyShader
         /// </summary>
         public void EnsureDepthTexture()
         {
-            int resolution = _textureResolution;
+            int resolution = ResolveTextureResolution();
 
             // 既存のRenderTextureが存在し、解像度が一致する場合はそのまま
             if (_depthRenderTexture != null && _depthRenderTexture.width == resolution)
@@ -394,6 +392,31 @@ namespace ShadowOnlyShader
 
             // 新しいRenderTextureを作成
             _depthRenderTexture = CreateDepthRenderTexture(resolution);
+        }
+
+        #endregion
+
+        #region Texture Resolution
+
+        /// <summary>
+        /// _textureResolution の実効値を返す。
+        /// UseURPResolution (0) の場合は URP Asset の mainLightShadowmapResolution を使用し、
+        /// それも取得できない場合は 1024 にフォールバックする。
+        /// </summary>
+        internal int ResolveTextureResolution()
+        {
+            if (_textureResolution != UseURPResolution)
+            {
+                return _textureResolution;
+            }
+
+            var urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+            if (urpAsset != null)
+            {
+                return urpAsset.mainLightShadowmapResolution;
+            }
+
+            return 1024;
         }
 
         #endregion
@@ -474,7 +497,7 @@ namespace ShadowOnlyShader
 
         /// <summary>
         /// 現在のTransformと投影パラメータを保存する。
-        /// SyncWithSourceLightがONになる直前に呼び出す。
+        /// SourceLightが設定される直前に呼び出す。
         /// </summary>
         internal void SavePreSyncState()
         {
@@ -487,12 +510,13 @@ namespace ShadowOnlyShader
             _savedFarClipPlane = _farClipPlane;
             _savedDepthBias = _depthBias;
             _savedNormalBias = _normalBias;
+            _savedShadowAlpha = _shadowAlpha;
             _hasSavedPreSyncState = true;
         }
 
         /// <summary>
         /// 保存済みのTransformと投影パラメータを復元する。
-        /// SyncWithSourceLightがOFFになった直後に呼び出す。
+        /// SourceLightがクリアされた直後に呼び出す。
         /// </summary>
         internal void RestorePreSyncState()
         {
@@ -507,6 +531,7 @@ namespace ShadowOnlyShader
             _farClipPlane = _savedFarClipPlane;
             _depthBias = _savedDepthBias;
             _normalBias = _savedNormalBias;
+            _shadowAlpha = _savedShadowAlpha;
             _hasSavedPreSyncState = false;
         }
 
@@ -516,12 +541,12 @@ namespace ShadowOnlyShader
         internal bool HasSavedPreSyncState => _hasSavedPreSyncState;
 
         /// <summary>
-        /// SyncWithSourceLightが有効かつSourceLightが設定されている場合、
-        /// Lightコンポーネントから位置・回転と投影パラメータ、バイアス値を同期する。
+        /// SourceLightが設定されている場合、
+        /// Lightコンポーネントから位置・回転・投影パラメータ・バイアス・影の濃さを同期する。
         /// </summary>
         private void SyncFromSourceLight()
         {
-            if (!_syncWithSourceLight || _sourceLight == null) return;
+            if (_sourceLight == null) return;
 
             // Transform同期
             Transform lightTransform = _sourceLight.transform;
@@ -551,6 +576,9 @@ namespace ShadowOnlyShader
             // バイアス同期
             _depthBias = _sourceLight.shadowBias;
             _normalBias = _sourceLight.shadowNormalBias;
+
+            // 影の濃さ同期
+            _shadowAlpha = _sourceLight.shadowStrength;
         }
 
         #endregion
@@ -585,7 +613,10 @@ namespace ShadowOnlyShader
             _orthographicSize = Mathf.Max(_orthographicSize, 0.001f);
             _nearClipPlane = Mathf.Max(_nearClipPlane, 0.001f);
             _farClipPlane = Mathf.Max(_farClipPlane, _nearClipPlane + 0.001f);
-            _textureResolution = Mathf.Clamp(_textureResolution, 64, 4096);
+            if (_textureResolution != UseURPResolution)
+            {
+                _textureResolution = Mathf.Clamp(_textureResolution, 64, 4096);
+            }
             _shadowAlpha = Mathf.Clamp01(_shadowAlpha);
             _blurRadius = Mathf.Max(_blurRadius, 0f);
             _blurDistanceFactor = Mathf.Max(_blurDistanceFactor, 0f);
@@ -599,7 +630,7 @@ namespace ShadowOnlyShader
 
         private void LateUpdate()
         {
-            bool isSyncing = _syncWithSourceLight && _sourceLight != null;
+            bool isSyncing = _sourceLight != null;
 
             // OFF → ON 遷移: 現在の状態を保存
             if (isSyncing && !_wasSyncing)

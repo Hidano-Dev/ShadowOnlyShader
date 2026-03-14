@@ -5,23 +5,22 @@ namespace ShadowOnlyShader.Editor
 {
     /// <summary>
     /// VirtualLightのカスタムInspector。
-    /// SourceLight設定時にChromaticAberrationColorを非表示にする。
-    /// SyncWithSourceLight有効時にProjectionパラメータとBiasを非表示にする。
-    /// TextureResolutionを2のべき乗ドロップダウンで表示する。
+    /// SourceLight設定時に同期対象フィールドを非表示にし、ChromaticAberrationColorも非表示にする。
+    /// TextureResolutionを2のべき乗ドロップダウン（URP Default付き）で表示する。
     /// </summary>
     [CustomEditor(typeof(VirtualLight))]
     public class VirtualLightEditor : UnityEditor.Editor
     {
         private SerializedProperty _sourceLight;
-        private SerializedProperty _syncWithSourceLight;
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
         private SerializedProperty _textureResolution;
 
-        // 2のべき乗解像度の選択肢
-        private static readonly int[] ResolutionValues = { 64, 128, 256, 512, 1024, 2048, 4096 };
+        // 解像度ドロップダウンの選択肢（0 = URP Default）
+        private static readonly int[] ResolutionValues = { 0, 64, 128, 256, 512, 1024, 2048, 4096 };
         private static readonly GUIContent[] ResolutionLabels =
         {
+            new GUIContent("URP Default"),
             new GUIContent("64"),
             new GUIContent("128"),
             new GUIContent("256"),
@@ -31,7 +30,7 @@ namespace ShadowOnlyShader.Editor
             new GUIContent("4096"),
         };
 
-        // SyncWithSourceLight有効時に非表示にするフィールド
+        // SourceLight設定時に非表示にするフィールド
         private static readonly string[] SyncedFields =
         {
             "_projectionMode",
@@ -40,12 +39,12 @@ namespace ShadowOnlyShader.Editor
             "_farClipPlane",
             "_depthBias",
             "_normalBias",
+            "_shadowAlpha",
         };
 
         private void OnEnable()
         {
             _sourceLight = serializedObject.FindProperty("_sourceLight");
-            _syncWithSourceLight = serializedObject.FindProperty("_syncWithSourceLight");
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
             _projectionMode = serializedObject.FindProperty("_projectionMode");
             _textureResolution = serializedObject.FindProperty("_textureResolution");
@@ -56,7 +55,9 @@ namespace ShadowOnlyShader.Editor
             serializedObject.Update();
 
             bool hasSourceLight = _sourceLight.objectReferenceValue != null;
-            bool wasSyncing = hasSourceLight && _syncWithSourceLight.boolValue;
+
+            // SourceLight着脱の検出（Undo対応で保存/復元を行う）
+            Light prevLight = _sourceLight.objectReferenceValue as Light;
 
             // 全プロパティを描画
             SerializedProperty iterator = serializedObject.GetIterator();
@@ -72,12 +73,6 @@ namespace ShadowOnlyShader.Editor
                     {
                         EditorGUILayout.PropertyField(iterator);
                     }
-                    continue;
-                }
-
-                // SourceLightが未設定の場合、SyncWithSourceLightトグルを非表示
-                if (iterator.propertyPath == "_syncWithSourceLight" && !hasSourceLight)
-                {
                     continue;
                 }
 
@@ -101,8 +96,8 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
-                // Sync有効時、同期対象フィールドを非表示
-                if (wasSyncing && IsSyncedField(iterator.propertyPath))
+                // SourceLight設定時、同期対象フィールドを非表示
+                if (hasSourceLight && IsSyncedField(iterator.propertyPath))
                 {
                     continue;
                 }
@@ -110,15 +105,18 @@ namespace ShadowOnlyShader.Editor
                 EditorGUILayout.PropertyField(iterator, true);
             }
 
-            // SyncWithSourceLightトグルの変更を検出し、Undo対応で保存/復元を行う
-            bool isSyncing = hasSourceLight && _syncWithSourceLight.boolValue;
-            if (wasSyncing != isSyncing)
+            // SourceLight着脱の検出
+            Light newLight = _sourceLight.objectReferenceValue as Light;
+            bool wasSet = prevLight != null;
+            bool isSet = newLight != null;
+
+            if (wasSet != isSet)
             {
                 var virtualLight = (VirtualLight)target;
-                Undo.RecordObject(virtualLight, isSyncing ? "Enable SyncWithSourceLight" : "Disable SyncWithSourceLight");
-                Undo.RecordObject(virtualLight.transform, isSyncing ? "Enable SyncWithSourceLight" : "Disable SyncWithSourceLight");
+                Undo.RecordObject(virtualLight, isSet ? "Set SourceLight" : "Clear SourceLight");
+                Undo.RecordObject(virtualLight.transform, isSet ? "Set SourceLight" : "Clear SourceLight");
 
-                if (isSyncing)
+                if (isSet)
                 {
                     virtualLight.SavePreSyncState();
                 }
@@ -128,10 +126,10 @@ namespace ShadowOnlyShader.Editor
                 }
             }
 
-            if (isSyncing)
+            if (hasSourceLight)
             {
                 EditorGUILayout.HelpBox(
-                    "SourceLight から Transform・投影パラメータ・Bias を自動同期中です。",
+                    "SourceLight から Transform・投影パラメータ・Bias・ShadowAlpha を自動同期中です。",
                     MessageType.Info);
             }
 
@@ -154,13 +152,12 @@ namespace ShadowOnlyShader.Editor
 
         private static int FindResolutionIndex(int value)
         {
-            // 完全一致を探す
             for (int i = 0; i < ResolutionValues.Length; i++)
             {
                 if (ResolutionValues[i] == value) return i;
             }
 
-            // 一致しない場合は最も近い値を選択
+            // 一致しない場合は最も近い値を選択（0=URP Defaultは除外して比較）
             int bestIndex = 0;
             int bestDiff = int.MaxValue;
             for (int i = 0; i < ResolutionValues.Length; i++)

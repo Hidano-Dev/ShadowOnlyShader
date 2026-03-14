@@ -15,8 +15,8 @@ namespace ShadowOnlyShader.Editor
         {
             if (virtualLight == null) return;
 
-            // Sync有効時はSourceLightのTransformと投影パラメータで描画する
-            bool useLightTransform = virtualLight.SyncWithSourceLight && virtualLight.SourceLight != null;
+            // SourceLight設定時はSourceLightのTransformと投影パラメータで描画する
+            bool useLightTransform = virtualLight.SourceLight != null;
             Transform drawTransform = useLightTransform
                 ? virtualLight.SourceLight.transform
                 : virtualLight.transform;
@@ -30,7 +30,7 @@ namespace ShadowOnlyShader.Editor
             Matrix4x4 oldMatrix = Gizmos.matrix;
             Gizmos.matrix = Matrix4x4.TRS(drawTransform.position, drawTransform.rotation, Vector3.one);
 
-            // Sync有効時はLightから投影パラメータを取得
+            // SourceLight設定時はLightから投影パラメータを取得
             ProjectionMode projMode;
             float fov, orthoSize, near, far;
 
