@@ -7,6 +7,7 @@ namespace ShadowOnlyShader.Editor
     /// VirtualLightのカスタムInspector。
     /// SourceLight設定時に同期対象フィールドを非表示にし、ChromaticAberrationColorも非表示にする。
     /// TextureResolutionを2のべき乗ドロップダウン（URP Default付き）で表示する。
+    /// オプション項目はフォールドアウトで畳んで表示する。
     /// </summary>
     [CustomEditor(typeof(VirtualLight))]
     public class VirtualLightEditor : UnityEditor.Editor
@@ -15,11 +16,32 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
         private SerializedProperty _textureResolution;
+
+        // Shadow Color / Hue Shift
         private SerializedProperty _shadowColor;
         private SerializedProperty _hueShift;
 
+        // Depth Bias
+        private SerializedProperty _depthBias;
+        private SerializedProperty _normalBias;
+
+        // Distance Effects
+        private SerializedProperty _blurDistanceFactor;
+        private SerializedProperty _blurCameraDistanceFactor;
+        private SerializedProperty _alphaCameraDistanceFactor;
+        private SerializedProperty _cameraDistancePower;
+
+        // Effects
+        private SerializedProperty _chromaticAberration;
+        private SerializedProperty _contactHardeningStrength;
+
         private static Texture2D _hueSpectrumTexture;
+
+        // Foldout states
         private bool _shadowColorFoldout;
+        private bool _depthBiasFoldout;
+        private bool _distanceEffectsFoldout;
+        private bool _effectsFoldout;
 
         // 解像度ドロップダウンの選択肢（0 = URP Default）
         private static readonly int[] ResolutionValues = { 0, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
@@ -46,14 +68,42 @@ namespace ShadowOnlyShader.Editor
             "_shadowAlpha",
         };
 
+        // フォールドアウト内で描画するためイテレーターではスキップするフィールド
+        private static readonly string[] FoldoutFields =
+        {
+            "_shadowColor",
+            "_hueShift",
+            "_depthBias",
+            "_normalBias",
+            "_blurDistanceFactor",
+            "_blurCameraDistanceFactor",
+            "_alphaCameraDistanceFactor",
+            "_cameraDistancePower",
+            "_chromaticAberration",
+            "_contactHardeningStrength",
+        };
+
         private void OnEnable()
         {
             _sourceLight = serializedObject.FindProperty("_sourceLight");
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
             _projectionMode = serializedObject.FindProperty("_projectionMode");
             _textureResolution = serializedObject.FindProperty("_textureResolution");
+
             _shadowColor = serializedObject.FindProperty("_shadowColor");
             _hueShift = serializedObject.FindProperty("_hueShift");
+
+            _depthBias = serializedObject.FindProperty("_depthBias");
+            _normalBias = serializedObject.FindProperty("_normalBias");
+
+            _blurDistanceFactor = serializedObject.FindProperty("_blurDistanceFactor");
+            _blurCameraDistanceFactor = serializedObject.FindProperty("_blurCameraDistanceFactor");
+            _alphaCameraDistanceFactor = serializedObject.FindProperty("_alphaCameraDistanceFactor");
+            _cameraDistancePower = serializedObject.FindProperty("_cameraDistancePower");
+
+            _chromaticAberration = serializedObject.FindProperty("_chromaticAberration");
+            _contactHardeningStrength = serializedObject.FindProperty("_contactHardeningStrength");
+
             EnsureHueSpectrumTexture();
         }
 
@@ -90,19 +140,6 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
-                // ShadowColor + HueShift をフォールドアウトにまとめて表示
-                if (iterator.propertyPath == "_shadowColor")
-                {
-                    DrawShadowColorSection();
-                    continue;
-                }
-
-                // HueShift は ShadowColor セクション内で描画済み
-                if (iterator.propertyPath == "_hueShift")
-                {
-                    continue;
-                }
-
                 // SourceLightが設定されている場合、ChromaticAberrationColorを非表示
                 if (iterator.propertyPath == "_chromaticAberrationColor" && hasSourceLight)
                 {
@@ -119,6 +156,21 @@ namespace ShadowOnlyShader.Editor
                 // SourceLight設定時、同期対象フィールドを非表示
                 if (hasSourceLight && IsSyncedField(iterator.propertyPath))
                 {
+                    continue;
+                }
+
+                // フォールドアウト対象フィールドはグループの先頭で一括描画、それ以外はスキップ
+                if (IsFoldoutField(iterator.propertyPath))
+                {
+                    // 各グループの先頭フィールドでセクションを描画
+                    if (iterator.propertyPath == "_shadowColor")
+                        DrawShadowColorSection();
+                    else if (iterator.propertyPath == "_depthBias")
+                        DrawDepthBiasSection();
+                    else if (iterator.propertyPath == "_blurDistanceFactor")
+                        DrawDistanceEffectsSection();
+                    else if (iterator.propertyPath == "_chromaticAberration")
+                        DrawEffectsSection();
                     continue;
                 }
 
@@ -156,6 +208,58 @@ namespace ShadowOnlyShader.Editor
             serializedObject.ApplyModifiedProperties();
         }
 
+        #region Foldout Sections
+
+        private void DrawShadowColorSection()
+        {
+            _shadowColorFoldout = EditorGUILayout.Foldout(_shadowColorFoldout, "Shadow Color / Hue Shift", true);
+            if (!_shadowColorFoldout) return;
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(_shadowColor);
+            DrawHueShiftSlider();
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawDepthBiasSection()
+        {
+            _depthBiasFoldout = EditorGUILayout.Foldout(_depthBiasFoldout, "Depth Bias", true);
+            if (!_depthBiasFoldout) return;
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(_depthBias);
+            EditorGUILayout.PropertyField(_normalBias);
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawDistanceEffectsSection()
+        {
+            _distanceEffectsFoldout = EditorGUILayout.Foldout(_distanceEffectsFoldout, "Distance Effects", true);
+            if (!_distanceEffectsFoldout) return;
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(_blurDistanceFactor);
+            EditorGUILayout.PropertyField(_blurCameraDistanceFactor);
+            EditorGUILayout.PropertyField(_alphaCameraDistanceFactor);
+            EditorGUILayout.PropertyField(_cameraDistancePower);
+            EditorGUI.indentLevel--;
+        }
+
+        private void DrawEffectsSection()
+        {
+            _effectsFoldout = EditorGUILayout.Foldout(_effectsFoldout, "Effects", true);
+            if (!_effectsFoldout) return;
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(_chromaticAberration);
+            EditorGUILayout.PropertyField(_contactHardeningStrength);
+            EditorGUI.indentLevel--;
+        }
+
+        #endregion
+
+        #region Resolution Popup
+
         private void DrawResolutionPopup()
         {
             int currentValue = _textureResolution.intValue;
@@ -192,25 +296,9 @@ namespace ShadowOnlyShader.Editor
             return bestIndex;
         }
 
-        private static bool IsSyncedField(string propertyPath)
-        {
-            foreach (var field in SyncedFields)
-            {
-                if (propertyPath == field) return true;
-            }
-            return false;
-        }
+        #endregion
 
-        private void DrawShadowColorSection()
-        {
-            _shadowColorFoldout = EditorGUILayout.Foldout(_shadowColorFoldout, "Shadow Color / Hue Shift", true);
-            if (!_shadowColorFoldout) return;
-
-            EditorGUI.indentLevel++;
-            EditorGUILayout.PropertyField(_shadowColor);
-            DrawHueShiftSlider();
-            EditorGUI.indentLevel--;
-        }
+        #region Hue Shift Slider
 
         private static void EnsureHueSpectrumTexture()
         {
@@ -296,6 +384,28 @@ namespace ShadowOnlyShader.Editor
             GUI.Label(degreeRect, $"{_hueShift.floatValue:F0}°", smallStyle);
         }
 
+        #endregion
+
+        #region Utilities
+
+        private static bool IsSyncedField(string propertyPath)
+        {
+            foreach (var field in SyncedFields)
+            {
+                if (propertyPath == field) return true;
+            }
+            return false;
+        }
+
+        private static bool IsFoldoutField(string propertyPath)
+        {
+            foreach (var field in FoldoutFields)
+            {
+                if (propertyPath == field) return true;
+            }
+            return false;
+        }
+
         private static void DrawRectBorder(Rect rect, Color color)
         {
             EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, 1f), color);               // top
@@ -303,5 +413,7 @@ namespace ShadowOnlyShader.Editor
             EditorGUI.DrawRect(new Rect(rect.x, rect.y, 1f, rect.height), color);               // left
             EditorGUI.DrawRect(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), color);       // right
         }
+
+        #endregion
     }
 }
