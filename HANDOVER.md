@@ -2,46 +2,55 @@
 
 ## 今回やったこと
 
-- 一部トゥーンシェーダー環境で影が表示されない問題を調査・解決
-- 根本原因: URP が Compatibility Mode（RenderGraph無効）で動作しており、`Execute()` が未実装だったため RenderPass が一切実行されなかった
-- `ShadowOnlyRenderPass.cs` にレガシーパス用 `Execute()` メソッドを追加
-- 描画ロジックを `CollectPassData()` と `ExecuteDrawCommands()` に共通化し、RenderGraph/レガシー両パスから使用する構成にリファクタリング
-- `Execute()` 追加後にキャラが消える問題が発生 → レンダーターゲット未復元が原因 → `cameraColorTargetHandle` / `cameraDepthTargetHandle` で復元を追加して解決
-- テスト更新: `ExecutePass` → `ExecuteDrawCommands` の名前変更に対応、`Execute` override と `CollectPassData` の存在テストを追加
+- VirtualLight の影解像度（TextureResolution）を2のべき乗ドロップダウンに変更（64〜4096）
+- 「URP Default」オプションを追加し、デフォルト値に設定（URP Asset の `mainLightShadowmapResolution` を参照）
+- `_syncWithSourceLight` パラメータを削除し、`SourceLight != null` で自動同期に簡素化
+- SourceLight を Inspector 最上部に配置
+- SourceLight 設定時に同期対象フィールドを非表示（グレーアウトではなく非表示）
+- Light コンポーネントからの追加同期: `shadowBias` → DepthBias, `shadowNormalBias` → NormalBias, `shadowStrength` → ShadowAlpha
+- Depth Bias セクションを Projection の直後に移動
+- IVirtualLight インターフェースから `SyncWithSourceLight` を削除
+- VirtualLightGizmoDrawer の `SyncWithSourceLight` 参照を修正
 
 ## 決定事項
 
-- RenderGraph パスと レガシーパス の両方をサポートする（`RecordRenderGraph` + `Execute`）
-- 描画ロジックは `ExecuteDrawCommands` に共通化し、レンダーターゲット管理はパスごとに行う
-  - RenderGraph: フレームワークが自動管理
-  - レガシー: `Execute()` 内で `cameraColorTargetHandle` / `cameraDepthTargetHandle` を使い明示復元
-- レガシーパス用 API の deprecation 警告は `#pragma warning disable CS0618` で抑制
+- SourceLight が設定されていれば常に同期する（トグル不要）
+- 同期対象フィールドはグレーアウトではなく**非表示**にする
+- TextureResolution のデフォルトは URP Default（内部値 0）
+- URP Asset 取得不可時のフォールバック解像度は 1024
+- Light.shadowStrength → ShadowAlpha の同期を追加
+- SourceLight 着脱時に SavePreSyncState / RestorePreSyncState で値を保存・復元
 
 ## 捨てた選択肢と理由
 
-- **RenderGraph を有効にするようユーザーに求める案** — ユーザー環境の URP 設定を制約するのは不適切。両パス対応が正解
-- **`ExecutePass` のシグネチャを維持する案** — レガシーパスでは `UnsafeGraphContext` が使えないため、`CommandBuffer` を直接受け取る `ExecuteDrawCommands` に変更が必要だった
-- **`BuiltinRenderTextureType.CameraTarget` でレンダーターゲット復元する案** — URP の中間テクスチャ使用時に正しいターゲットを指さない可能性があるため、`cameraColorTargetHandle` / `cameraDepthTargetHandle` を使用
+- **グレーアウト表示**: ユーザーが非表示を希望。同期中は Light 側で設定するため Inspector に表示する意味がない
+- **`_syncWithSourceLight` トグル**: SourceLight の null チェックで十分。パラメータが増えるだけで冗長
+- **TextureResolution を enum 型に変更**: 内部値が int で広く使われており（テスト含む）、Editor 側の Popup で対応する方が影響範囲が小さい
+- **解像度デフォルト 2048 固定**: URP Asset の設定を流用する方が一貫性がある
 
 ## ハマりどころ
 
-- Unity の警告 `Execute is not implemented, the pass won't be executed` が根本原因を示していた。Frame Debugger で Pass が見つからないのはこのため
-- `Execute()` 追加後、キャラが一部消える問題が発生。`ExecuteDrawCommands` 内で `SetRenderTarget(depthRT)` した後にレンダーターゲットを復元していなかったため、後続の描画パスが深度RTに向けて描画されていた
-- `cameraColorTargetHandle` / `cameraDepthTargetHandle` は Unity 6 で deprecated 扱いだが、レガシーパス（RenderGraph無効時）では必要
+- 特になし。スムーズに進行
 
 ## 学び
 
-- URP には RenderGraph パス（`RecordRenderGraph`）とレガシーパス（`Execute`）の2系統がある。Compatibility Mode では `Execute` のみが呼ばれる
-- RenderGraph の UnsafePass はレンダーターゲットを自動管理するが、レガシーパスではパス内で変更した状態を自分で復元する必要がある
-- 「トゥーンシェーダーで影が出ない」という報告の真因がシェーダーとは無関係（URP のレンダリングパス設定）だった
+- Unity の `Light` コンポーネントから取得できる影関連プロパティ: `shadowBias`, `shadowNormalBias`, `shadowStrength`, `spotAngle`, `range`, `color`
+- `GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset` で URP Asset にアクセス可能
+- `mainLightShadowmapResolution` で URP のメインライトシャドウマップ解像度を取得可能
 
 ## 次にやること
 
-1. **[高]** CHANGELOG.md、package.json のバージョン更新（レガシーパス対応は実質的な機能追加）
-2. **[中]** `renderer.sharedMaterials.Length` と実際の `mesh.subMeshCount` の不一致問題の対応（トゥーンシェーダーのアウトライン用マテリアルスロットで起こりうる）
-3. **[低]** `cameraColorTargetHandle` / `cameraDepthTargetHandle` が将来の Unity バージョンで削除された場合の代替手段を検討
+1. **[高] テストの修正** — `SyncWithSourceLight` を参照しているテストがあれば修正が必要（Tests~ / Tests 配下）
+2. **[高] 動作確認** — Unity Editor 上で以下を確認
+   - URP Default 解像度が正しく解決されるか
+   - SourceLight 設定/解除時の Inspector 表示切り替え
+   - SourceLight 設定/解除時の値の保存・復元
+   - Light のパラメータ変更がリアルタイムに反映されるか
+3. **[低] サンプルシーン** — `ShadowOnlySample.unity` の `_textureResolution: 1024` が残っているが動作に支障なし（URP Default にしたい場合は手動で 0 に変更）
 
 ## 関連ファイル
 
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/ShadowOnlyRenderPass.cs`（主要変更）
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Tests~/Runtime/ShadowOnlyRenderPassTests.cs`（テスト更新）
+- `Packages/com.hidano.shadow-only-shader/Runtime/VirtualLight.cs` — メイン変更
+- `Packages/com.hidano.shadow-only-shader/Runtime/IVirtualLight.cs` — SyncWithSourceLight 削除
+- `Packages/com.hidano.shadow-only-shader/Editor/VirtualLightEditor.cs` — ドロップダウン・非表示ロジック
+- `Packages/com.hidano.shadow-only-shader/Editor/VirtualLightGizmoDrawer.cs` — SyncWithSourceLight 参照修正
