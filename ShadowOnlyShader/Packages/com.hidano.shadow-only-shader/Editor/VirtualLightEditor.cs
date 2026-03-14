@@ -6,7 +6,8 @@ namespace ShadowOnlyShader.Editor
     /// <summary>
     /// VirtualLightのカスタムInspector。
     /// SourceLight設定時にChromaticAberrationColorを非表示にする。
-    /// SyncWithSourceLight有効時にProjectionパラメータを読み取り専用にする。
+    /// SyncWithSourceLight有効時にProjectionパラメータとBiasを読み取り専用にする。
+    /// TextureResolutionを2のべき乗ドロップダウンで表示する。
     /// </summary>
     [CustomEditor(typeof(VirtualLight))]
     public class VirtualLightEditor : UnityEditor.Editor
@@ -15,6 +16,20 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _syncWithSourceLight;
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
+        private SerializedProperty _textureResolution;
+
+        // 2のべき乗解像度の選択肢
+        private static readonly int[] ResolutionValues = { 64, 128, 256, 512, 1024, 2048, 4096 };
+        private static readonly GUIContent[] ResolutionLabels =
+        {
+            new GUIContent("64"),
+            new GUIContent("128"),
+            new GUIContent("256"),
+            new GUIContent("512"),
+            new GUIContent("1024"),
+            new GUIContent("2048"),
+            new GUIContent("4096"),
+        };
 
         // Projection fields that are synced from SourceLight
         private static readonly string[] SyncedProjectionFields =
@@ -25,12 +40,20 @@ namespace ShadowOnlyShader.Editor
             "_farClipPlane",
         };
 
+        // Bias fields that are synced from SourceLight
+        private static readonly string[] SyncedBiasFields =
+        {
+            "_depthBias",
+            "_normalBias",
+        };
+
         private void OnEnable()
         {
             _sourceLight = serializedObject.FindProperty("_sourceLight");
             _syncWithSourceLight = serializedObject.FindProperty("_syncWithSourceLight");
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
             _projectionMode = serializedObject.FindProperty("_projectionMode");
+            _textureResolution = serializedObject.FindProperty("_textureResolution");
         }
 
         public override void OnInspectorGUI()
@@ -76,6 +99,13 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
+                // TextureResolutionは2のべき乗ドロップダウンで表示
+                if (iterator.propertyPath == "_textureResolution")
+                {
+                    DrawResolutionPopup();
+                    continue;
+                }
+
                 // Sync有効時、同期対象のProjectionフィールドは読み取り専用で表示
                 if (wasSyncing && IsSyncedField(iterator.propertyPath))
                 {
@@ -110,16 +140,57 @@ namespace ShadowOnlyShader.Editor
             if (isSyncing)
             {
                 EditorGUILayout.HelpBox(
-                    "SourceLight から Transform と投影パラメータを自動同期中です。グレーアウトされたパラメータは Light から取得されます。",
+                    "SourceLight から Transform・投影パラメータ・Bias を自動同期中です。グレーアウトされたパラメータは Light から取得されます。",
                     MessageType.Info);
             }
 
             serializedObject.ApplyModifiedProperties();
         }
 
+        private void DrawResolutionPopup()
+        {
+            int currentValue = _textureResolution.intValue;
+            int selectedIndex = FindResolutionIndex(currentValue);
+
+            var label = new GUIContent(_textureResolution.displayName, _textureResolution.tooltip);
+            int newIndex = EditorGUILayout.Popup(label, selectedIndex, ResolutionLabels);
+
+            if (newIndex >= 0 && newIndex < ResolutionValues.Length)
+            {
+                _textureResolution.intValue = ResolutionValues[newIndex];
+            }
+        }
+
+        private static int FindResolutionIndex(int value)
+        {
+            // 完全一致を探す
+            for (int i = 0; i < ResolutionValues.Length; i++)
+            {
+                if (ResolutionValues[i] == value) return i;
+            }
+
+            // 一致しない場合は最も近い値を選択
+            int bestIndex = 0;
+            int bestDiff = int.MaxValue;
+            for (int i = 0; i < ResolutionValues.Length; i++)
+            {
+                int diff = Mathf.Abs(ResolutionValues[i] - value);
+                if (diff < bestDiff)
+                {
+                    bestDiff = diff;
+                    bestIndex = i;
+                }
+            }
+            return bestIndex;
+        }
+
         private static bool IsSyncedField(string propertyPath)
         {
             foreach (var field in SyncedProjectionFields)
+            {
+                if (propertyPath == field) return true;
+            }
+            foreach (var field in SyncedBiasFields)
             {
                 if (propertyPath == field) return true;
             }

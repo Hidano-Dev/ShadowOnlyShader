@@ -10,6 +10,23 @@ namespace ShadowOnlyShader
     /// </summary>
     public class VirtualLight : MonoBehaviour, IVirtualLight
     {
+        #region Serialized Fields - Source Light
+
+        [Header("Source Light")]
+        [Tooltip("参照する Unity Light コンポーネント。設定すると色収差のフリンジ色が Light の色に連動します。SyncWithSourceLight を有効にすると Transform や投影パラメータも自動同期されます")]
+        [SerializeField]
+        private Light _sourceLight;
+
+        [Tooltip("有効にすると、SourceLight の Transform（位置・回転）と投影パラメータ（ProjectionMode・FOV・Range・Bias 等）を毎フレーム自動同期します")]
+        [SerializeField]
+        private bool _syncWithSourceLight = false;
+
+        [Tooltip("色収差の光源色（SourceLight未設定時のフォールバック）。白=標準的なRGB色収差、単色=色収差なし（物理的に正しい挙動）")]
+        [SerializeField]
+        private Color _chromaticAberrationColor = Color.white;
+
+        #endregion
+
         #region Serialized Fields - Projection Parameters
 
         [Header("Projection")]
@@ -91,18 +108,6 @@ namespace ShadowOnlyShader
         [Min(0f)]
         private float _contactHardeningStrength = 0f;
 
-        [Tooltip("色収差の光源参照（オプション）。設定すると、このLightの色に応じて色収差のフリンジ色が物理的に変化します。暖色光なら赤フリンジが強く、寒色光なら青フリンジが強くなります")]
-        [SerializeField]
-        private Light _sourceLight;
-
-        [Tooltip("有効にすると、SourceLight の Transform（位置・回転）と投影パラメータ（ProjectionMode・FOV・Range 等）を毎フレーム自動同期します")]
-        [SerializeField]
-        private bool _syncWithSourceLight = false;
-
-        [Tooltip("色収差の光源色（SourceLight未設定時のフォールバック）。白=標準的なRGB色収差、単色=色収差なし（物理的に正しい挙動）")]
-        [SerializeField]
-        private Color _chromaticAberrationColor = Color.white;
-
         [Header("Depth Bias")]
         [Tooltip("影のちらつき（セルフシャドウ）を抑えるためのオフセット値。影が欠ける場合は値を大きくしてください")]
         [SerializeField]
@@ -137,6 +142,8 @@ namespace ShadowOnlyShader
         [HideInInspector] [SerializeField] private float _savedFieldOfView = 60f;
         [HideInInspector] [SerializeField] private float _savedOrthographicSize = 5f;
         [HideInInspector] [SerializeField] private float _savedFarClipPlane = 100f;
+        [HideInInspector] [SerializeField] private float _savedDepthBias;
+        [HideInInspector] [SerializeField] private float _savedNormalBias;
 
         #endregion
 
@@ -478,6 +485,8 @@ namespace ShadowOnlyShader
             _savedFieldOfView = _fieldOfView;
             _savedOrthographicSize = _orthographicSize;
             _savedFarClipPlane = _farClipPlane;
+            _savedDepthBias = _depthBias;
+            _savedNormalBias = _normalBias;
             _hasSavedPreSyncState = true;
         }
 
@@ -496,6 +505,8 @@ namespace ShadowOnlyShader
             _fieldOfView = _savedFieldOfView;
             _orthographicSize = _savedOrthographicSize;
             _farClipPlane = _savedFarClipPlane;
+            _depthBias = _savedDepthBias;
+            _normalBias = _savedNormalBias;
             _hasSavedPreSyncState = false;
         }
 
@@ -506,7 +517,7 @@ namespace ShadowOnlyShader
 
         /// <summary>
         /// SyncWithSourceLightが有効かつSourceLightが設定されている場合、
-        /// Lightコンポーネントから位置・回転と投影パラメータを同期する。
+        /// Lightコンポーネントから位置・回転と投影パラメータ、バイアス値を同期する。
         /// </summary>
         private void SyncFromSourceLight()
         {
@@ -536,6 +547,10 @@ namespace ShadowOnlyShader
                     _farClipPlane = _sourceLight.range;
                     break;
             }
+
+            // バイアス同期
+            _depthBias = _sourceLight.shadowBias;
+            _normalBias = _sourceLight.shadowNormalBias;
         }
 
         #endregion
