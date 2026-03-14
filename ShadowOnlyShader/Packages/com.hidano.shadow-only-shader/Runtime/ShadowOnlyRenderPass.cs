@@ -228,7 +228,7 @@ namespace ShadowOnlyShader
                         continue;
                     }
 
-                    int submeshCount = renderer.sharedMaterialCount;
+                    int submeshCount = renderer.sharedMaterials.Length;
                     for (int s = 0; s < submeshCount; s++)
                     {
                         cmd.DrawRenderer(renderer, data.depthOnlyMaterial, s, 0);
