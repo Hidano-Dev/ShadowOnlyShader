@@ -10,6 +10,7 @@ namespace ShadowOnlyShader.Editor
     /// オプション項目はフォールドアウトで畳んで表示する。
     /// </summary>
     [CustomEditor(typeof(VirtualLight))]
+    [CanEditMultipleObjects]
     public class VirtualLightEditor : UnityEditor.Editor
     {
         private SerializedProperty _sourceLight;
@@ -113,14 +114,55 @@ namespace ShadowOnlyShader.Editor
         {
             serializedObject.Update();
 
+            // マルチオブジェクト対応: いずれかがSourceLightを持つか、値が混在しているかを判定
             bool hasSourceLight = _sourceLight.objectReferenceValue != null;
+            bool mixedSourceLight = _sourceLight.hasMultipleDifferentValues;
+            bool anyHasSourceLight = hasSourceLight || mixedSourceLight;
 
             // 実効的な投影モードを算出（SourceLight設定時はLight.typeから、未設定時は_projectionModeから）
             // Edit モードでは SyncFromSourceLight が走らないため、
             // Light.type と _projectionMode が乖離する場合がある。
             // 表示制御には常にこの effectiveProjectionMode を使用する。
-            ProjectionMode effectiveProjectionMode;
-            if (hasSourceLight)
+            // マルチ選択時で投影モードが混在する場合はnullとし、両方のフィールドを表示する。
+            ProjectionMode? effectiveProjectionMode;
+            if (serializedObject.isEditingMultipleObjects)
+            {
+                // 全オブジェクトの実効モードを調べ、統一されていればそれを使用
+                ProjectionMode? unified = null;
+                bool allSame = true;
+                foreach (var t in targets)
+                {
+                    var vl = (VirtualLight)t;
+                    var vlSo = new SerializedObject(vl);
+                    var vlSourceLight = vlSo.FindProperty("_sourceLight");
+                    var vlProjectionMode = vlSo.FindProperty("_projectionMode");
+                    ProjectionMode mode;
+                    if (vlSourceLight.objectReferenceValue != null)
+                    {
+                        var srcLight = vlSourceLight.objectReferenceValue as Light;
+                        mode = (srcLight != null && srcLight.type == LightType.Directional)
+                            ? ProjectionMode.Orthographic
+                            : ProjectionMode.Perspective;
+                    }
+                    else
+                    {
+                        mode = (ProjectionMode)vlProjectionMode.enumValueIndex;
+                    }
+                    vlSo.Dispose();
+
+                    if (unified == null)
+                    {
+                        unified = mode;
+                    }
+                    else if (unified != mode)
+                    {
+                        allSame = false;
+                        break;
+                    }
+                }
+                effectiveProjectionMode = allSame ? unified : null;
+            }
+            else if (hasSourceLight)
             {
                 var srcLight = _sourceLight.objectReferenceValue as Light;
                 effectiveProjectionMode = (srcLight != null && srcLight.type == LightType.Directional)
@@ -153,6 +195,7 @@ namespace ShadowOnlyShader.Editor
                 }
 
                 // Orthographic時はFieldOfViewを非表示、Perspective時はOrthographicSizeを非表示
+                // 投影モードが混在する場合は両方表示する
                 if (iterator.propertyPath == "_fieldOfView"
                     && effectiveProjectionMode == ProjectionMode.Orthographic)
                 {
@@ -166,7 +209,8 @@ namespace ShadowOnlyShader.Editor
                 }
 
                 // SourceLightが設定されている場合、ChromaticAberrationColorを非表示
-                if (iterator.propertyPath == "_chromaticAberrationColor" && hasSourceLight)
+                // マルチ選択時はいずれかがSourceLightを持つ場合に非表示
+                if (iterator.propertyPath == "_chromaticAberrationColor" && anyHasSourceLight)
                 {
                     continue;
                 }
@@ -179,7 +223,8 @@ namespace ShadowOnlyShader.Editor
                 }
 
                 // SourceLight設定時、同期対象フィールドを非表示
-                if (hasSourceLight && IsSyncedField(iterator.propertyPath))
+                // マルチ選択時はいずれかがSourceLightを持つ場合に非表示
+                if (anyHasSourceLight && IsSyncedField(iterator.propertyPath))
                 {
                     continue;
                 }
@@ -202,28 +247,31 @@ namespace ShadowOnlyShader.Editor
                 EditorGUILayout.PropertyField(iterator, true);
             }
 
-            // SourceLight着脱の検出
+            // SourceLight着脱の検出（マルチオブジェクト対応）
             Light newLight = _sourceLight.objectReferenceValue as Light;
             bool wasSet = prevLight != null;
             bool isSet = newLight != null;
 
             if (wasSet != isSet)
             {
-                var virtualLight = (VirtualLight)target;
-                Undo.RecordObject(virtualLight, isSet ? "Set SourceLight" : "Clear SourceLight");
-                Undo.RecordObject(virtualLight.transform, isSet ? "Set SourceLight" : "Clear SourceLight");
+                foreach (var t in targets)
+                {
+                    var virtualLight = (VirtualLight)t;
+                    Undo.RecordObject(virtualLight, isSet ? "Set SourceLight" : "Clear SourceLight");
+                    Undo.RecordObject(virtualLight.transform, isSet ? "Set SourceLight" : "Clear SourceLight");
 
-                if (isSet)
-                {
-                    virtualLight.SavePreSyncState();
-                }
-                else
-                {
-                    virtualLight.RestorePreSyncState();
+                    if (isSet)
+                    {
+                        virtualLight.SavePreSyncState();
+                    }
+                    else
+                    {
+                        virtualLight.RestorePreSyncState();
+                    }
                 }
             }
 
-            if (hasSourceLight)
+            if (anyHasSourceLight)
             {
                 EditorGUILayout.HelpBox(
                     "SourceLight から Transform・投影パラメータ・ShadowAlpha を自動同期中です。",
