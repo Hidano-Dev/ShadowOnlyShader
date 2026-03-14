@@ -106,7 +106,7 @@ namespace ShadowOnlyShader
         [Header("Depth Bias")]
         [Tooltip("影のちらつき（セルフシャドウ）を抑えるためのオフセット値。影が欠ける場合は値を大きくしてください")]
         [SerializeField]
-        private float _depthBias = 0.005f;
+        private float _depthBias = 0f;
 
         [Tooltip("面の向きに応じた影のオフセット補正。斜めの面で影がちらつく場合に調整します")]
         [SerializeField]
