@@ -15,6 +15,9 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
         private SerializedProperty _textureResolution;
+        private SerializedProperty _hueShift;
+
+        private static Texture2D _hueSpectrumTexture;
 
         // 解像度ドロップダウンの選択肢（0 = URP Default）
         private static readonly int[] ResolutionValues = { 0, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
@@ -47,6 +50,8 @@ namespace ShadowOnlyShader.Editor
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
             _projectionMode = serializedObject.FindProperty("_projectionMode");
             _textureResolution = serializedObject.FindProperty("_textureResolution");
+            _hueShift = serializedObject.FindProperty("_hueShift");
+            EnsureHueSpectrumTexture();
         }
 
         public override void OnInspectorGUI()
@@ -85,6 +90,13 @@ namespace ShadowOnlyShader.Editor
                 // SourceLightが設定されている場合、ChromaticAberrationColorを非表示
                 if (iterator.propertyPath == "_chromaticAberrationColor" && hasSourceLight)
                 {
+                    continue;
+                }
+
+                // HueShiftはグラデーションスライダーで表示
+                if (iterator.propertyPath == "_hueShift")
+                {
+                    DrawHueShiftSlider();
                     continue;
                 }
 
@@ -178,6 +190,98 @@ namespace ShadowOnlyShader.Editor
                 if (propertyPath == field) return true;
             }
             return false;
+        }
+
+        private static void EnsureHueSpectrumTexture()
+        {
+            if (_hueSpectrumTexture != null) return;
+
+            const int width = 256;
+            _hueSpectrumTexture = new Texture2D(width, 1, TextureFormat.RGBA32, false)
+            {
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+
+            var pixels = new Color[width];
+            for (int i = 0; i < width; i++)
+            {
+                float hue = (float)i / (width - 1);
+                pixels[i] = Color.HSVToRGB(hue, 1f, 1f);
+            }
+
+            _hueSpectrumTexture.SetPixels(pixels);
+            _hueSpectrumTexture.Apply();
+        }
+
+        private void DrawHueShiftSlider()
+        {
+            var label = new GUIContent(_hueShift.displayName, _hueShift.tooltip);
+            Rect totalRect = EditorGUILayout.GetControlRect(true, EditorGUIUtility.singleLineHeight);
+
+            // Label
+            totalRect = EditorGUI.PrefixLabel(totalRect, label);
+
+            // Color swatch (right side)
+            const float swatchWidth = 24f;
+            const float swatchMargin = 4f;
+            Rect swatchRect = new Rect(
+                totalRect.xMax - swatchWidth,
+                totalRect.y,
+                swatchWidth,
+                totalRect.height);
+
+            // Slider area (remaining space)
+            Rect sliderRect = new Rect(
+                totalRect.x,
+                totalRect.y,
+                totalRect.width - swatchWidth - swatchMargin,
+                totalRect.height);
+
+            // Draw gradient background
+            if (_hueSpectrumTexture != null)
+            {
+                // Inset slightly to align with slider track
+                Rect gradientRect = new Rect(
+                    sliderRect.x + 2f,
+                    sliderRect.y + 2f,
+                    sliderRect.width - 4f,
+                    sliderRect.height - 4f);
+                GUI.DrawTexture(gradientRect, _hueSpectrumTexture);
+            }
+
+            // Draw slider on top (transparent background via style trick)
+            EditorGUI.BeginChangeCheck();
+            float newValue = GUI.HorizontalSlider(sliderRect, _hueShift.floatValue, 0f, 360f);
+            if (EditorGUI.EndChangeCheck())
+            {
+                _hueShift.floatValue = newValue;
+            }
+
+            // Draw preview swatch
+            float hueNormalized = _hueShift.floatValue / 360f;
+            Color previewColor = Color.HSVToRGB(hueNormalized, 1f, 1f);
+            EditorGUI.DrawRect(swatchRect, previewColor);
+
+            // Swatch border
+            Color borderColor = EditorGUIUtility.isProSkin
+                ? new Color(0.1f, 0.1f, 0.1f)
+                : new Color(0.6f, 0.6f, 0.6f);
+            DrawRectBorder(swatchRect, borderColor);
+
+            // Degree label below
+            Rect degreeRect = new Rect(sliderRect.x, sliderRect.yMax, sliderRect.width, EditorGUIUtility.singleLineHeight);
+            EditorGUILayout.GetControlRect(false, EditorGUIUtility.singleLineHeight * 0.5f);
+            var smallStyle = new GUIStyle(EditorStyles.miniLabel) { alignment = TextAnchor.UpperCenter };
+            GUI.Label(degreeRect, $"{_hueShift.floatValue:F0}°", smallStyle);
+        }
+
+        private static void DrawRectBorder(Rect rect, Color color)
+        {
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, 1f), color);               // top
+            EditorGUI.DrawRect(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), color);       // bottom
+            EditorGUI.DrawRect(new Rect(rect.x, rect.y, 1f, rect.height), color);               // left
+            EditorGUI.DrawRect(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), color);       // right
         }
     }
 }
