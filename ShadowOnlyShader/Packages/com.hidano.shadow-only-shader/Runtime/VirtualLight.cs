@@ -18,6 +18,15 @@ namespace ShadowOnlyShader
         /// </summary>
         internal const int UseURPResolution = 0;
 
+        #region Serialized Fields - Caster
+
+        [Header("Caster")]
+        [Tooltip("影を落とすオブジェクトの親。この配下にあるすべてのメッシュが影の元になります")]
+        [SerializeField]
+        private GameObject _casterRoot;
+
+        #endregion
+
         #region Serialized Fields - Source Light
 
         [Header("Source Light")]
@@ -121,16 +130,6 @@ namespace ShadowOnlyShader
         [Min(0f)]
         private float _contactHardeningStrength = 0f;
 
-        #endregion
-
-        #region Serialized Fields - Caster
-
-        [Header("Caster")]
-        [Tooltip("影を落とすオブジェクトの親。この配下にあるすべてのメッシュが影の元になります")]
-        [SerializeField]
-        private GameObject _casterRoot;
-
-        [Header("Quality")]
         [Tooltip("影の解像度。URP Default は URP Asset の Main Light Shadow Resolution を使用します")]
         [SerializeField]
         private int _textureResolution = UseURPResolution;
