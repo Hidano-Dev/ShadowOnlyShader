@@ -54,6 +54,15 @@ namespace ShadowOnlyShader
         [Min(0.002f)]
         private float _farClipPlane = 100f;
 
+        [Header("Depth Bias")]
+        [Tooltip("影のちらつき（セルフシャドウ）を抑えるためのオフセット値。影が欠ける場合は値を大きくしてください")]
+        [SerializeField]
+        private float _depthBias = 0f;
+
+        [Tooltip("面の向きに応じた影のオフセット補正。斜めの面で影がちらつく場合に調整します")]
+        [SerializeField]
+        private float _normalBias = 0f;
+
         #endregion
 
         #region Serialized Fields - Shadow Appearance
@@ -107,15 +116,6 @@ namespace ShadowOnlyShader
         [SerializeField]
         [Min(0f)]
         private float _contactHardeningStrength = 0f;
-
-        [Header("Depth Bias")]
-        [Tooltip("影のちらつき（セルフシャドウ）を抑えるためのオフセット値。影が欠ける場合は値を大きくしてください")]
-        [SerializeField]
-        private float _depthBias = 0f;
-
-        [Tooltip("面の向きに応じた影のオフセット補正。斜めの面で影がちらつく場合に調整します")]
-        [SerializeField]
-        private float _normalBias = 0f;
 
         #endregion
 

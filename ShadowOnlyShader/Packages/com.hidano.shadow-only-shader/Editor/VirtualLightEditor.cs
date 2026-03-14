@@ -6,7 +6,7 @@ namespace ShadowOnlyShader.Editor
     /// <summary>
     /// VirtualLightのカスタムInspector。
     /// SourceLight設定時にChromaticAberrationColorを非表示にする。
-    /// SyncWithSourceLight有効時にProjectionパラメータとBiasを読み取り専用にする。
+    /// SyncWithSourceLight有効時にProjectionパラメータとBiasを非表示にする。
     /// TextureResolutionを2のべき乗ドロップダウンで表示する。
     /// </summary>
     [CustomEditor(typeof(VirtualLight))]
@@ -31,18 +31,13 @@ namespace ShadowOnlyShader.Editor
             new GUIContent("4096"),
         };
 
-        // Projection fields that are synced from SourceLight
-        private static readonly string[] SyncedProjectionFields =
+        // SyncWithSourceLight有効時に非表示にするフィールド
+        private static readonly string[] SyncedFields =
         {
             "_projectionMode",
             "_fieldOfView",
             "_orthographicSize",
             "_farClipPlane",
-        };
-
-        // Bias fields that are synced from SourceLight
-        private static readonly string[] SyncedBiasFields =
-        {
             "_depthBias",
             "_normalBias",
         };
@@ -106,13 +101,9 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
-                // Sync有効時、同期対象のProjectionフィールドは読み取り専用で表示
+                // Sync有効時、同期対象フィールドを非表示
                 if (wasSyncing && IsSyncedField(iterator.propertyPath))
                 {
-                    using (new EditorGUI.DisabledScope(true))
-                    {
-                        EditorGUILayout.PropertyField(iterator, true);
-                    }
                     continue;
                 }
 
@@ -140,7 +131,7 @@ namespace ShadowOnlyShader.Editor
             if (isSyncing)
             {
                 EditorGUILayout.HelpBox(
-                    "SourceLight から Transform・投影パラメータ・Bias を自動同期中です。グレーアウトされたパラメータは Light から取得されます。",
+                    "SourceLight から Transform・投影パラメータ・Bias を自動同期中です。",
                     MessageType.Info);
             }
 
@@ -186,11 +177,7 @@ namespace ShadowOnlyShader.Editor
 
         private static bool IsSyncedField(string propertyPath)
         {
-            foreach (var field in SyncedProjectionFields)
-            {
-                if (propertyPath == field) return true;
-            }
-            foreach (var field in SyncedBiasFields)
+            foreach (var field in SyncedFields)
             {
                 if (propertyPath == field) return true;
             }
