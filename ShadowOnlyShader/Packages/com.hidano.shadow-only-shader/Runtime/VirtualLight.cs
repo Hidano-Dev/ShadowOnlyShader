@@ -67,7 +67,6 @@ namespace ShadowOnlyShader
         [Min(0.002f)]
         private float _farClipPlane = 100f;
 
-        [Header("Depth Bias")]
         [Tooltip("影のちらつき（セルフシャドウ）を抑えるためのオフセット値。影が欠ける場合は値を大きくしてください")]
         [SerializeField]
         private float _depthBias = 0f;
@@ -80,7 +79,6 @@ namespace ShadowOnlyShader
 
         #region Serialized Fields - Shadow Appearance
 
-        [Header("Shadow Appearance")]
         [Tooltip("影の色。黒以外にも好きな色の影を落とすことができます")]
         [SerializeField]
         private Color _shadowColor = Color.black;
