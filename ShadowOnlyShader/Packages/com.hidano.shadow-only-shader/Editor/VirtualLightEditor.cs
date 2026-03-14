@@ -25,7 +25,8 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _depthBias;
         private SerializedProperty _normalBias;
 
-        // Distance Effects
+        // Blur
+        private SerializedProperty _blurRadius;
         private SerializedProperty _blurDistanceFactor;
         private SerializedProperty _blurCameraDistanceFactor;
         private SerializedProperty _alphaCameraDistanceFactor;
@@ -40,7 +41,7 @@ namespace ShadowOnlyShader.Editor
         // Foldout states
         private bool _shadowColorFoldout;
         private bool _depthBiasFoldout;
-        private bool _distanceEffectsFoldout;
+        private bool _blurFoldout;
         private bool _effectsFoldout;
 
         // 解像度ドロップダウンの選択肢（0 = URP Default）
@@ -74,6 +75,7 @@ namespace ShadowOnlyShader.Editor
             "_hueShift",
             "_depthBias",
             "_normalBias",
+            "_blurRadius",
             "_blurDistanceFactor",
             "_blurCameraDistanceFactor",
             "_alphaCameraDistanceFactor",
@@ -95,6 +97,7 @@ namespace ShadowOnlyShader.Editor
             _depthBias = serializedObject.FindProperty("_depthBias");
             _normalBias = serializedObject.FindProperty("_normalBias");
 
+            _blurRadius = serializedObject.FindProperty("_blurRadius");
             _blurDistanceFactor = serializedObject.FindProperty("_blurDistanceFactor");
             _blurCameraDistanceFactor = serializedObject.FindProperty("_blurCameraDistanceFactor");
             _alphaCameraDistanceFactor = serializedObject.FindProperty("_alphaCameraDistanceFactor");
@@ -189,8 +192,8 @@ namespace ShadowOnlyShader.Editor
                         DrawShadowColorSection();
                     else if (iterator.propertyPath == "_depthBias")
                         DrawDepthBiasSection();
-                    else if (iterator.propertyPath == "_blurDistanceFactor")
-                        DrawDistanceEffectsSection();
+                    else if (iterator.propertyPath == "_blurRadius")
+                        DrawBlurSection();
                     else if (iterator.propertyPath == "_chromaticAberration")
                         DrawEffectsSection();
                     continue;
@@ -254,12 +257,13 @@ namespace ShadowOnlyShader.Editor
             EditorGUI.indentLevel--;
         }
 
-        private void DrawDistanceEffectsSection()
+        private void DrawBlurSection()
         {
-            _distanceEffectsFoldout = EditorGUILayout.Foldout(_distanceEffectsFoldout, "Distance Effects", true);
-            if (!_distanceEffectsFoldout) return;
+            _blurFoldout = EditorGUILayout.Foldout(_blurFoldout, "Blur", true);
+            if (!_blurFoldout) return;
 
             EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(_blurRadius);
             EditorGUILayout.PropertyField(_blurDistanceFactor);
             EditorGUILayout.PropertyField(_blurCameraDistanceFactor);
             EditorGUILayout.PropertyField(_alphaCameraDistanceFactor);
