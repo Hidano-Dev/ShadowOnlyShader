@@ -15,9 +15,11 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
         private SerializedProperty _textureResolution;
+        private SerializedProperty _shadowColor;
         private SerializedProperty _hueShift;
 
         private static Texture2D _hueSpectrumTexture;
+        private bool _shadowColorFoldout;
 
         // 解像度ドロップダウンの選択肢（0 = URP Default）
         private static readonly int[] ResolutionValues = { 0, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
@@ -50,6 +52,7 @@ namespace ShadowOnlyShader.Editor
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
             _projectionMode = serializedObject.FindProperty("_projectionMode");
             _textureResolution = serializedObject.FindProperty("_textureResolution");
+            _shadowColor = serializedObject.FindProperty("_shadowColor");
             _hueShift = serializedObject.FindProperty("_hueShift");
             EnsureHueSpectrumTexture();
         }
@@ -87,16 +90,22 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
-                // SourceLightが設定されている場合、ChromaticAberrationColorを非表示
-                if (iterator.propertyPath == "_chromaticAberrationColor" && hasSourceLight)
+                // ShadowColor + HueShift をフォールドアウトにまとめて表示
+                if (iterator.propertyPath == "_shadowColor")
+                {
+                    DrawShadowColorSection();
+                    continue;
+                }
+
+                // HueShift は ShadowColor セクション内で描画済み
+                if (iterator.propertyPath == "_hueShift")
                 {
                     continue;
                 }
 
-                // HueShiftはグラデーションスライダーで表示
-                if (iterator.propertyPath == "_hueShift")
+                // SourceLightが設定されている場合、ChromaticAberrationColorを非表示
+                if (iterator.propertyPath == "_chromaticAberrationColor" && hasSourceLight)
                 {
-                    DrawHueShiftSlider();
                     continue;
                 }
 
@@ -190,6 +199,17 @@ namespace ShadowOnlyShader.Editor
                 if (propertyPath == field) return true;
             }
             return false;
+        }
+
+        private void DrawShadowColorSection()
+        {
+            _shadowColorFoldout = EditorGUILayout.Foldout(_shadowColorFoldout, "Shadow Color / Hue Shift", true);
+            if (!_shadowColorFoldout) return;
+
+            EditorGUI.indentLevel++;
+            EditorGUILayout.PropertyField(_shadowColor);
+            DrawHueShiftSlider();
+            EditorGUI.indentLevel--;
         }
 
         private static void EnsureHueSpectrumTexture()
