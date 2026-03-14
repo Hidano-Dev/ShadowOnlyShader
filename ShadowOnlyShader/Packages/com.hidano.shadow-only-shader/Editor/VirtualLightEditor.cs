@@ -112,6 +112,23 @@ namespace ShadowOnlyShader.Editor
 
             bool hasSourceLight = _sourceLight.objectReferenceValue != null;
 
+            // 実効的な投影モードを算出（SourceLight設定時はLight.typeから、未設定時は_projectionModeから）
+            // Edit モードでは SyncFromSourceLight が走らないため、
+            // Light.type と _projectionMode が乖離する場合がある。
+            // 表示制御には常にこの effectiveProjectionMode を使用する。
+            ProjectionMode effectiveProjectionMode;
+            if (hasSourceLight)
+            {
+                var srcLight = _sourceLight.objectReferenceValue as Light;
+                effectiveProjectionMode = (srcLight != null && srcLight.type == LightType.Directional)
+                    ? ProjectionMode.Orthographic
+                    : ProjectionMode.Perspective;
+            }
+            else
+            {
+                effectiveProjectionMode = (ProjectionMode)_projectionMode.enumValueIndex;
+            }
+
             // SourceLight着脱の検出（Undo対応で保存/復元を行う）
             Light prevLight = _sourceLight.objectReferenceValue as Light;
 
@@ -132,16 +149,15 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
-                // Orthographicモード時、FieldOfViewを非表示
+                // Orthographic時はFieldOfViewを非表示、Perspective時はOrthographicSizeを非表示
                 if (iterator.propertyPath == "_fieldOfView"
-                    && _projectionMode.enumValueIndex == (int)ProjectionMode.Orthographic)
+                    && effectiveProjectionMode == ProjectionMode.Orthographic)
                 {
                     continue;
                 }
 
-                // Perspectiveモード時、OrthographicSizeを非表示
                 if (iterator.propertyPath == "_orthographicSize"
-                    && _projectionMode.enumValueIndex == (int)ProjectionMode.Perspective)
+                    && effectiveProjectionMode == ProjectionMode.Perspective)
                 {
                     continue;
                 }
