@@ -602,6 +602,81 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &608235826
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 608235827}
+  - component: {fileID: 608235828}
+  m_Layer: 0
+  m_Name: VirtualLight (2)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &608235827
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 608235826}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0.27165377, y: 0.69427204, z: -0.32374436, w: 0.58256346}
+  m_LocalPosition: {x: 0.47000003, y: 5.46, z: 0.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1146349003}
+  m_LocalEulerAnglesHint: {x: 50, y: 100, z: 0}
+--- !u!114 &608235828
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 608235826}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.VirtualLight
+  _casterRoot: {fileID: 239774089}
+  _sourceLight: {fileID: 0}
+  _chromaticAberrationColor: {r: 1, g: 1, b: 1, a: 1}
+  _projectionMode: 0
+  _fieldOfView: 22.3
+  _orthographicSize: 5
+  _nearClipPlane: 0.1
+  _farClipPlane: 100
+  _depthBias: 0
+  _normalBias: 0
+  _shadowColor: {r: 0, g: 0, b: 0, a: 1}
+  _shadowAlpha: 0.5
+  _blurRadius: 1
+  _blurDistanceFactor: 0.2
+  _blurCameraDistanceFactor: 0
+  _alphaCameraDistanceFactor: 0
+  _cameraDistancePower: 1
+  _hueShift: 0
+  _chromaticAberration: 0.05
+  _contactHardeningStrength: 0
+  _textureResolution: 8192
+  _hasSavedPreSyncState: 0
+  _savedPosition: {x: 0, y: 0, z: 0}
+  _savedRotation: {x: 0, y: 0, z: 0, w: 1}
+  _savedProjectionMode: 0
+  _savedFieldOfView: 60
+  _savedOrthographicSize: 5
+  _savedFarClipPlane: 100
+  _savedDepthBias: 0
+  _savedNormalBias: 0
+  _savedShadowAlpha: 0.5
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -651,6 +726,81 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &960861167
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 960861168}
+  - component: {fileID: 960861169}
+  m_Layer: 0
+  m_Name: VirtualLight (1)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &960861168
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 960861167}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.091471285, y: 0.88482475, z: -0.41260052, w: -0.19616081}
+  m_LocalPosition: {x: 0.47000003, y: 5.46, z: 0.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1146349003}
+  m_LocalEulerAnglesHint: {x: 50, y: 205, z: 0}
+--- !u!114 &960861169
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 960861167}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.VirtualLight
+  _casterRoot: {fileID: 239774089}
+  _sourceLight: {fileID: 0}
+  _chromaticAberrationColor: {r: 1, g: 1, b: 1, a: 1}
+  _projectionMode: 0
+  _fieldOfView: 22.3
+  _orthographicSize: 5
+  _nearClipPlane: 0.1
+  _farClipPlane: 100
+  _depthBias: 0
+  _normalBias: 0
+  _shadowColor: {r: 0, g: 0, b: 0, a: 1}
+  _shadowAlpha: 0.5
+  _blurRadius: 1
+  _blurDistanceFactor: 0.2
+  _blurCameraDistanceFactor: 0
+  _alphaCameraDistanceFactor: 0
+  _cameraDistancePower: 1
+  _hueShift: 0
+  _chromaticAberration: 0.05
+  _contactHardeningStrength: 0
+  _textureResolution: 8192
+  _hasSavedPreSyncState: 0
+  _savedPosition: {x: 0, y: 0, z: 0}
+  _savedRotation: {x: 0, y: 0, z: 0, w: 1}
+  _savedProjectionMode: 0
+  _savedFieldOfView: 60
+  _savedOrthographicSize: 5
+  _savedFarClipPlane: 100
+  _savedDepthBias: 0
+  _savedNormalBias: 0
+  _savedShadowAlpha: 0.5
 --- !u!1 &1146349001
 GameObject:
   m_ObjectHideFlags: 0
@@ -697,10 +847,164 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 120049617}
   - {fileID: 42382715}
+  - {fileID: 120049617}
+  - {fileID: 1494710815}
+  - {fileID: 960861168}
+  - {fileID: 608235827}
+  - {fileID: 1793994239}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1494710814
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1494710815}
+  - component: {fileID: 1494710816}
+  m_Layer: 0
+  m_Name: VirtualLight
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1494710815
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1494710814}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.38302216, y: 0.3830224, z: -0.17860627, w: -0.8213937}
+  m_LocalPosition: {x: 0.47, y: 5.46, z: 0.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1146349003}
+  m_LocalEulerAnglesHint: {x: 50, y: 310, z: 0}
+--- !u!114 &1494710816
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1494710814}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.VirtualLight
+  _casterRoot: {fileID: 239774089}
+  _sourceLight: {fileID: 0}
+  _chromaticAberrationColor: {r: 1, g: 1, b: 1, a: 1}
+  _projectionMode: 0
+  _fieldOfView: 22.3
+  _orthographicSize: 5
+  _nearClipPlane: 0.1
+  _farClipPlane: 100
+  _depthBias: 0
+  _normalBias: 0
+  _shadowColor: {r: 0, g: 0, b: 0, a: 1}
+  _shadowAlpha: 0.5
+  _blurRadius: 1
+  _blurDistanceFactor: 0.2
+  _blurCameraDistanceFactor: 0
+  _alphaCameraDistanceFactor: 0
+  _cameraDistancePower: 1
+  _hueShift: 0
+  _chromaticAberration: 0.05
+  _contactHardeningStrength: 0
+  _textureResolution: 8192
+  _hasSavedPreSyncState: 0
+  _savedPosition: {x: 0, y: 0, z: 0}
+  _savedRotation: {x: 0, y: 0, z: 0, w: 1}
+  _savedProjectionMode: 0
+  _savedFieldOfView: 60
+  _savedOrthographicSize: 5
+  _savedFarClipPlane: 100
+  _savedDepthBias: 0
+  _savedNormalBias: 0
+  _savedShadowAlpha: 0.5
+--- !u!1 &1793994238
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1793994239}
+  - component: {fileID: 1793994240}
+  m_Layer: 0
+  m_Name: VirtualLight (3)
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1793994239
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1793994238}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0.37486702, y: -0.41848606, z: 0.19514324, w: -0.80390495}
+  m_LocalPosition: {x: 0.47000003, y: 5.46, z: 0.7}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1146349003}
+  m_LocalEulerAnglesHint: {x: 50, y: 415, z: 0}
+--- !u!114 &1793994240
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1793994238}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.VirtualLight
+  _casterRoot: {fileID: 239774089}
+  _sourceLight: {fileID: 0}
+  _chromaticAberrationColor: {r: 1, g: 1, b: 1, a: 1}
+  _projectionMode: 0
+  _fieldOfView: 22.3
+  _orthographicSize: 5
+  _nearClipPlane: 0.1
+  _farClipPlane: 100
+  _depthBias: 0
+  _normalBias: 0
+  _shadowColor: {r: 0, g: 0, b: 0, a: 1}
+  _shadowAlpha: 0.5
+  _blurRadius: 1
+  _blurDistanceFactor: 0.2
+  _blurCameraDistanceFactor: 0
+  _alphaCameraDistanceFactor: 0
+  _cameraDistancePower: 1
+  _hueShift: 0
+  _chromaticAberration: 0.05
+  _contactHardeningStrength: 0
+  _textureResolution: 8192
+  _hasSavedPreSyncState: 0
+  _savedPosition: {x: 0, y: 0, z: 0}
+  _savedRotation: {x: 0, y: 0, z: 0, w: 1}
+  _savedProjectionMode: 0
+  _savedFieldOfView: 60
+  _savedOrthographicSize: 5
+  _savedFarClipPlane: 100
+  _savedDepthBias: 0
+  _savedNormalBias: 0
+  _savedShadowAlpha: 0.5
 --- !u!1001 &1872840788
 PrefabInstance:
   m_ObjectHideFlags: 0
