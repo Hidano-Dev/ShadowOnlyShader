@@ -121,9 +121,10 @@ namespace ShadowOnlyShader
         [SerializeField]
         private GameObject _casterRoot;
 
-        [Tooltip("影の解像度（ピクセル数）。値が大きいほど影がくっきりしますが、処理負荷が増えます")]
+        [Header("Quality")]
+        [Tooltip("影の解像度（ピクセル数）。値が大きいほど影がくっきりしますが、処理負荷が増えます。Blur を小さくしてパキッとした影を出す場合は 2048〜4096 を推奨します")]
         [SerializeField]
-        private int _textureResolution = 1024;
+        private int _textureResolution = 2048;
 
         #endregion
 
