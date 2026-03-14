@@ -124,9 +124,9 @@ namespace ShadowOnlyShader.Tests.Editor
             Assert.AreEqual(UnityEngine.Rendering.TextureDimension.Tex2DArray,
                 manager.DepthArrayTexture.dimension,
                 "DepthArrayTextureはTexture2DArrayであるべき");
-            Assert.AreEqual(ShadowOnlyManager.MaxVirtualLights,
+            Assert.AreEqual(8,
                 manager.DepthArrayTexture.volumeDepth,
-                "DepthArrayTextureのスライス数はMaxVirtualLightsであるべき");
+                "DepthArrayTextureのスライス数は8であるべき");
 
             // Cleanup
             Object.DestroyImmediate(go);
