@@ -539,6 +539,28 @@ namespace ShadowOnlyShader
             // CasterRoot配下のRendererを自動収集
             _renderersDirty = true;
             CollectRenderers();
+
+            // 親ManagerにVirtualLightリストの再収集を通知
+            NotifyManagerRefresh();
+        }
+
+        private void OnDisable()
+        {
+            // 親ManagerにVirtualLightリストの再収集を通知
+            NotifyManagerRefresh();
+        }
+
+        /// <summary>
+        /// 親階層のShadowOnlyManagerにVirtualLightリストの再収集を通知する。
+        /// OnEnable/OnDisable時に呼び出され、ランタイムでのアクティブ切り替えに対応する。
+        /// </summary>
+        private void NotifyManagerRefresh()
+        {
+            var manager = GetComponentInParent<ShadowOnlyManager>();
+            if (manager != null)
+            {
+                manager.RefreshVirtualLights();
+            }
         }
 
         private void OnValidate()

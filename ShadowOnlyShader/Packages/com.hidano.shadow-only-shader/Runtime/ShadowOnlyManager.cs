@@ -400,6 +400,12 @@ namespace ShadowOnlyShader
                     continue;
                 }
 
+                // 非アクティブなVirtualLightはスキップ
+                if (!vl.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
                 // VP行列（GPU変換済み）
                 // GL.GetGPUProjectionMatrixでプラットフォーム固有のProjection行列に変換し、
                 // 深度RenderPassと同じ変換を適用することで深度値の一致を保証する

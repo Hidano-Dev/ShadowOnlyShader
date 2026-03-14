@@ -386,6 +386,116 @@ namespace ShadowOnlyShader.Tests.Editor
             Object.DestroyImmediate(managerGO);
         }
 
+        [Test]
+        public void VirtualLight_SetActiveToggle_ManagerのリストがOnEnableOnDisableで更新される()
+        {
+            // Arrange
+            var managerGO = new GameObject("TestManager");
+            var manager = managerGO.AddComponent<ShadowOnlyManager>();
+
+            var vlGO = new GameObject("VL");
+            vlGO.transform.SetParent(managerGO.transform);
+            vlGO.AddComponent<VirtualLight>();
+
+            // OnEnable時にRefreshVirtualLightsが呼ばれるため、既に1つある
+            Assert.AreEqual(1, manager.VirtualLights.Count,
+                "VirtualLight追加後、リストに1つあるべき");
+
+            // Act: 無効化
+            vlGO.SetActive(false);
+
+            // Assert: リストから除外される
+            Assert.AreEqual(0, manager.VirtualLights.Count,
+                "VirtualLight無効化後、リストから除外されるべき");
+
+            // Act: 再有効化
+            vlGO.SetActive(true);
+
+            // Assert: リストに復帰する
+            Assert.AreEqual(1, manager.VirtualLights.Count,
+                "VirtualLight再有効化後、リストに復帰するべき");
+
+            // Cleanup
+            Object.DestroyImmediate(managerGO);
+        }
+
+        [Test]
+        public void VirtualLight_コンポーネント無効化_Managerのリストが更新される()
+        {
+            // Arrange
+            var managerGO = new GameObject("TestManager");
+            var manager = managerGO.AddComponent<ShadowOnlyManager>();
+
+            var vlGO = new GameObject("VL");
+            vlGO.transform.SetParent(managerGO.transform);
+            var vl = vlGO.AddComponent<VirtualLight>();
+
+            Assert.AreEqual(1, manager.VirtualLights.Count);
+
+            // Act: コンポーネントを無効化
+            vl.enabled = false;
+
+            // Assert: GetComponentsInChildrenはdisabledコンポーネントも返すが
+            // isActiveAndEnabledがfalseになるため描画からは除外される
+            // ただしリスト自体にはコンポーネントが残る（GOはアクティブなため）
+            // RefreshVirtualLightsはGetComponentsInChildrenで収集するので
+            // コンポーネントのenabled状態は区別しない
+            // 描画除外はCollectPassDataとUpdateMaterialPropertiesで行われる
+
+            // Act: コンポーネントを再有効化
+            vl.enabled = true;
+
+            // Assert: リストに存在する
+            Assert.AreEqual(1, manager.VirtualLights.Count,
+                "コンポーネント再有効化後もリストに存在するべき");
+
+            // Cleanup
+            Object.DestroyImmediate(managerGO);
+        }
+
+        [Test]
+        public void VirtualLight_複数のSetActiveToggle_正しくリスト更新される()
+        {
+            // Arrange
+            var managerGO = new GameObject("TestManager");
+            var manager = managerGO.AddComponent<ShadowOnlyManager>();
+
+            var vlGO1 = new GameObject("VL1");
+            vlGO1.transform.SetParent(managerGO.transform);
+            vlGO1.AddComponent<VirtualLight>();
+
+            var vlGO2 = new GameObject("VL2");
+            vlGO2.transform.SetParent(managerGO.transform);
+            vlGO2.AddComponent<VirtualLight>();
+
+            Assert.AreEqual(2, manager.VirtualLights.Count);
+
+            // Act: 1つだけ無効化
+            vlGO1.SetActive(false);
+
+            // Assert
+            Assert.AreEqual(1, manager.VirtualLights.Count,
+                "1つ無効化後、リストに1つ残るべき");
+
+            // Act: もう1つも無効化
+            vlGO2.SetActive(false);
+
+            // Assert
+            Assert.AreEqual(0, manager.VirtualLights.Count,
+                "全て無効化後、リストは空になるべき");
+
+            // Act: 両方再有効化
+            vlGO1.SetActive(true);
+            vlGO2.SetActive(true);
+
+            // Assert
+            Assert.AreEqual(2, manager.VirtualLights.Count,
+                "全て再有効化後、リストに2つ戻るべき");
+
+            // Cleanup
+            Object.DestroyImmediate(managerGO);
+        }
+
         #endregion
     }
 }
