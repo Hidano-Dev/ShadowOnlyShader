@@ -157,6 +157,12 @@ namespace ShadowOnlyShader
             // Resolve結果をグローバルテクスチャとして設定
             // Display Pass（Pass 0）の _SHADOW_RESOLVE_ACTIVE バリアントがこのテクスチャをサンプリングする
             cmd.SetGlobalTexture(_resolveTexId, rt);
+
+            // マテリアルにも直接設定（multi_compile_local使用時はマテリアル単位のテクスチャが必要）
+            if (data.floorMaterial != null)
+            {
+                data.floorMaterial.SetTexture(_resolveTexId, rt);
+            }
         }
 
         #endregion

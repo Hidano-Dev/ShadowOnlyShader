@@ -38,7 +38,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             #pragma multi_compile _ _BLUR_LOW _BLUR_MID _BLUR_HIGH
 
             // Resolve有効/無効の切り替え（ShadowOnlyManagerがマテリアルキーワードで制御）
-            #pragma multi_compile _ _SHADOW_RESOLVE_ACTIVE
+            #pragma multi_compile_local _ _SHADOW_RESOLVE_ACTIVE
 
             #include "Packages/com.hidano.shadow-only-shader/Runtime/Shaders/ShadowOnlyFloorCommon.hlsl"
 
