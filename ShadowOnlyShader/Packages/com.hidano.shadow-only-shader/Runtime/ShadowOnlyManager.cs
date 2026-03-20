@@ -535,23 +535,17 @@ namespace ShadowOnlyShader
         }
 
         /// <summary>
-        /// Resolve解像度スケールに応じたシェーダーキーワードを切り替える。
-        /// _SHADOW_RESOLVE_ACTIVE が有効な場合、Display Pass（Pass 0）は
-        /// Resolve結果テクスチャをサンプリングするバリアントにコンパイル時分岐する。
+        /// Resolve解像度スケールに応じたシェーダーuniform変数を設定する。
+        /// _ShadowResolveActive > 0.5 の場合、Display Pass（Pass 0）は
+        /// Resolve結果テクスチャをサンプリングするランタイム分岐を取る。
         /// LateUpdateで設定されるため、レンダリング前に確定する。
         /// </summary>
         private void UpdateResolveKeyword()
         {
             if (_floorMaterial == null) return;
 
-            if (_blurResolutionScale < 0.999f)
-            {
-                _floorMaterial.EnableKeyword("_SHADOW_RESOLVE_ACTIVE");
-            }
-            else
-            {
-                _floorMaterial.DisableKeyword("_SHADOW_RESOLVE_ACTIVE");
-            }
+            _floorMaterial.SetFloat("_ShadowResolveActive",
+                _blurResolutionScale < 0.999f ? 1.0f : 0.0f);
         }
 
         /// <summary>

@@ -10,10 +10,11 @@ namespace ShadowOnlyShader
     /// 影計算を低解像度RTで事前実行するRenderPass。
     /// BlurResolutionScale が 1.0 未満の場合に有効化され、
     /// フロアRendererを低解像度RTに描画してブラー等の重い計算を実行する。
-    /// 結果はグローバルテクスチャとして設定され、Display Pass（Pass 0）でサンプリングされる。
+    /// 結果はグローバルテクスチャ _ShadowResolveTex として設定され、
+    /// Display Pass（Pass 0）の _ShadowResolveActive ランタイム分岐でサンプリングされる。
     ///
-    /// 有効/無効の切り替えはShadowOnlyManagerがマテリアルキーワード
-    /// _SHADOW_RESOLVE_ACTIVE で制御する（LateUpdateで設定済み）。
+    /// 有効/無効の切り替えはShadowOnlyManagerが _ShadowResolveActive uniform変数で
+    /// 制御する（LateUpdateで設定済み）。
     /// このパスはResolve RTの描画とグローバルテクスチャの設定のみを行う。
     /// </summary>
     public class ShadowOnlyShadowResolvePass : ScriptableRenderPass
@@ -155,14 +156,8 @@ namespace ShadowOnlyShader
             }
 
             // Resolve結果をグローバルテクスチャとして設定
-            // Display Pass（Pass 0）の _SHADOW_RESOLVE_ACTIVE バリアントがこのテクスチャをサンプリングする
+            // Display Pass（Pass 0）の _ShadowResolveActive 分岐でこのテクスチャをサンプリングする
             cmd.SetGlobalTexture(_resolveTexId, rt);
-
-            // マテリアルにも直接設定（multi_compile_local使用時はマテリアル単位のテクスチャが必要）
-            if (data.floorMaterial != null)
-            {
-                data.floorMaterial.SetTexture(_resolveTexId, rt);
-            }
         }
 
         #endregion
