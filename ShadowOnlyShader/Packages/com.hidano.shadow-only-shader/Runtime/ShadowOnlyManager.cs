@@ -501,6 +501,9 @@ namespace ShadowOnlyShader
 
             // ブラー品質キーワードの切り替え
             UpdateBlurQualityKeywords();
+
+            // Resolve解像度スケールキーワードの切り替え
+            UpdateResolveKeyword();
         }
 
         /// <summary>
@@ -528,6 +531,26 @@ namespace ShadowOnlyShader
                 case BlurQuality.High:
                     _floorMaterial.EnableKeyword("_BLUR_HIGH");
                     break;
+            }
+        }
+
+        /// <summary>
+        /// Resolve解像度スケールに応じたシェーダーキーワードを切り替える。
+        /// _SHADOW_RESOLVE_ACTIVE が有効な場合、Display Pass（Pass 0）は
+        /// Resolve結果テクスチャをサンプリングするバリアントにコンパイル時分岐する。
+        /// LateUpdateで設定されるため、レンダリング前に確定する。
+        /// </summary>
+        private void UpdateResolveKeyword()
+        {
+            if (_floorMaterial == null) return;
+
+            if (_blurResolutionScale < 0.999f)
+            {
+                _floorMaterial.EnableKeyword("_SHADOW_RESOLVE_ACTIVE");
+            }
+            else
+            {
+                _floorMaterial.DisableKeyword("_SHADOW_RESOLVE_ACTIVE");
             }
         }
 

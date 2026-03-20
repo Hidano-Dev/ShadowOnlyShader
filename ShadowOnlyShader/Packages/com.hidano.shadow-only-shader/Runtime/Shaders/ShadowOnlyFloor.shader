@@ -18,8 +18,8 @@ Shader "Hidden/ShadowOnlyShader/Floor"
 
         // ==========================================
         // Pass 0: Display pass（URPが通常のTransparent描画で使用）
-        // _ShadowResolveActive が 1 のとき: Resolve結果テクスチャをサンプリング
-        // _ShadowResolveActive が 0 のとき: 従来通りフル影計算
+        // _SHADOW_RESOLVE_ACTIVE キーワード有効時: Resolve結果テクスチャをサンプリング
+        // キーワード無効時: 従来通りフル影計算
         // ==========================================
         Pass
         {
@@ -37,24 +37,25 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             // ブラー品質プリセット切り替え用キーワード
             #pragma multi_compile _ _BLUR_LOW _BLUR_MID _BLUR_HIGH
 
+            // Resolve有効/無効の切り替え（ShadowOnlyManagerがマテリアルキーワードで制御）
+            #pragma multi_compile _ _SHADOW_RESOLVE_ACTIVE
+
             #include "Packages/com.hidano.shadow-only-shader/Runtime/Shaders/ShadowOnlyFloorCommon.hlsl"
 
-            // Resolve用パラメータ（グローバル変数として設定される）
-            int _ShadowResolveActive;
+            // Resolve用テクスチャ（グローバルテクスチャとしてResolvePassから設定される）
             TEXTURE2D(_ShadowResolveTex);
             SAMPLER(sampler_ShadowResolveTex);
 
             half4 frag_display(Varyings input) : SV_TARGET
             {
-                // Resolveが有効な場合: 事前計算済みの低解像度テクスチャからサンプリング
-                if (_ShadowResolveActive > 0)
-                {
+                #if defined(_SHADOW_RESOLVE_ACTIVE)
+                    // Resolveが有効: 事前計算済みの低解像度テクスチャからサンプリング
                     float2 screenUV = input.positionCS.xy / _ScreenParams.xy;
                     return SAMPLE_TEXTURE2D(_ShadowResolveTex, sampler_ShadowResolveTex, screenUV);
-                }
-
-                // Resolveが無効な場合: 従来通りフル影計算
-                return ComputeFloorShadow(input);
+                #else
+                    // Resolveが無効: 従来通りフル影計算
+                    return ComputeFloorShadow(input);
+                #endif
             }
             ENDHLSL
         }

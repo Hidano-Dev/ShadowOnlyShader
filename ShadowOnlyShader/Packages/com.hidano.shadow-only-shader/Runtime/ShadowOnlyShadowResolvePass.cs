@@ -11,6 +11,10 @@ namespace ShadowOnlyShader
     /// BlurResolutionScale が 1.0 未満の場合に有効化され、
     /// フロアRendererを低解像度RTに描画してブラー等の重い計算を実行する。
     /// 結果はグローバルテクスチャとして設定され、Display Pass（Pass 0）でサンプリングされる。
+    ///
+    /// 有効/無効の切り替えはShadowOnlyManagerがマテリアルキーワード
+    /// _SHADOW_RESOLVE_ACTIVE で制御する（LateUpdateで設定済み）。
+    /// このパスはResolve RTの描画とグローバルテクスチャの設定のみを行う。
     /// </summary>
     public class ShadowOnlyShadowResolvePass : ScriptableRenderPass
     {
@@ -43,9 +47,6 @@ namespace ShadowOnlyShader
 
         /// <summary>Resolve用RenderTexture（パスが管理）。</summary>
         private RenderTexture _resolveRT;
-
-        /// <summary>シェーダーグローバル変数: Resolveアクティブフラグ。</summary>
-        private static readonly int _resolveActiveId = Shader.PropertyToID("_ShadowResolveActive");
 
         /// <summary>シェーダーグローバル変数: Resolveテクスチャ。</summary>
         private static readonly int _resolveTexId = Shader.PropertyToID("_ShadowResolveTex");
@@ -128,7 +129,7 @@ namespace ShadowOnlyShader
         /// <summary>
         /// CommandBufferを使用してResolve描画を実行する共通処理。
         /// 低解像度RTにフロアRendererをPass 1（Resolve）で描画し、
-        /// グローバルテクスチャ・フラグを設定する。
+        /// グローバルテクスチャを設定する。
         /// </summary>
         private static void ExecuteResolveCommands(CommandBuffer cmd, PassData data)
         {
@@ -139,10 +140,8 @@ namespace ShadowOnlyShader
             cmd.SetViewport(new Rect(0, 0, rt.width, rt.height));
             cmd.ClearRenderTarget(true, true, new Color(0, 0, 0, 0), 1.0f);
 
-            // シェーダーにフル影計算モードを指示
-            cmd.SetGlobalInt(_resolveActiveId, 0);
-
             // フロアRendererをPass 1（ShadowOnlyResolve）で描画
+            // Pass 1は常にフルシャドウ計算を実行する（キーワード _SHADOW_RESOLVE_ACTIVE の影響を受けない）
             for (int i = 0; i < data.floorRenderers.Count; i++)
             {
                 var renderer = data.floorRenderers[i];
@@ -156,18 +155,8 @@ namespace ShadowOnlyShader
             }
 
             // Resolve結果をグローバルテクスチャとして設定
+            // Display Pass（Pass 0）の _SHADOW_RESOLVE_ACTIVE バリアントがこのテクスチャをサンプリングする
             cmd.SetGlobalTexture(_resolveTexId, rt);
-
-            // Display Pass（Pass 0）にResolveサンプリングモードを指示
-            cmd.SetGlobalInt(_resolveActiveId, 1);
-        }
-
-        /// <summary>
-        /// Resolveを無効化するコマンドを発行する。
-        /// </summary>
-        private static void ExecuteDisableResolve(CommandBuffer cmd)
-        {
-            cmd.SetGlobalInt(_resolveActiveId, 0);
         }
 
         #endregion
@@ -181,11 +170,6 @@ namespace ShadowOnlyShader
         {
             if (!ShouldExecute())
             {
-                // Resolveを無効化
-                var disableCmd = CommandBufferPool.Get("ShadowOnly Resolve Disable");
-                ExecuteDisableResolve(disableCmd);
-                context.ExecuteCommandBuffer(disableCmd);
-                CommandBufferPool.Release(disableCmd);
                 return;
             }
 
@@ -228,17 +212,6 @@ namespace ShadowOnlyShader
         {
             if (!ShouldExecute())
             {
-                // Resolveを無効化するUnsafePassを登録
-                using (var builder = renderGraph.AddUnsafePass<PassData>(
-                    "ShadowOnly Resolve Disable", out var passData))
-                {
-                    builder.AllowPassCulling(false);
-                    builder.SetRenderFunc(static (PassData data, UnsafeGraphContext context) =>
-                    {
-                        var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
-                        ExecuteDisableResolve(cmd);
-                    });
-                }
                 return;
             }
 

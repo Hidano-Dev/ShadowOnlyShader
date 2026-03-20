@@ -12,12 +12,14 @@ namespace ShadowOnlyShader.Editor
     {
         private SerializedProperty _blurQuality;
         private SerializedProperty _blendMultiplier;
+        private SerializedProperty _blurResolutionScale;
         private SerializedProperty _floorRenderers;
 
         private void OnEnable()
         {
             _blurQuality = serializedObject.FindProperty("_blurQuality");
             _blendMultiplier = serializedObject.FindProperty("_blendMultiplier");
+            _blurResolutionScale = serializedObject.FindProperty("_blurResolutionScale");
             _floorRenderers = serializedObject.FindProperty("_floorRenderers");
         }
 
@@ -31,6 +33,7 @@ namespace ShadowOnlyShader.Editor
             EditorGUILayout.LabelField("グローバルパラメータ", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_blurQuality);
             EditorGUILayout.PropertyField(_blendMultiplier);
+            EditorGUILayout.PropertyField(_blurResolutionScale);
 
             EditorGUILayout.Space(8);
 

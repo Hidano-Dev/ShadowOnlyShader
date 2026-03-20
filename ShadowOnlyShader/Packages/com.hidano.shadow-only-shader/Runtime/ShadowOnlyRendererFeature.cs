@@ -88,8 +88,8 @@ namespace ShadowOnlyShader
             _renderPass.SetManager(manager);
             renderer.EnqueuePass(_renderPass);
 
-            // Resolveパスを常に登録（パス内部でBlurResolutionScaleを判定し、
-            // 1.0の場合は_ShadowResolveActiveを0に設定して無効化する）
+            // Resolveパスを登録（パス内部でBlurResolutionScaleを判定し、
+            // 1.0の場合は早期リターンする。キーワード制御はManagerのLateUpdateで実施済み）
             if (_resolvePass != null)
             {
                 _resolvePass.SetManager(manager);
