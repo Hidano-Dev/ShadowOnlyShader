@@ -6,6 +6,7 @@ namespace ShadowOnlyShader
     /// <summary>
     /// 影のみ描画システムのScriptableRendererFeature。
     /// URP Universal Rendererに統合し、ShadowOnlyRenderPassの生成・管理を行う。
+    /// BlurResolutionScale が 1.0 未満の場合、ShadowOnlyShadowResolvePassも登録する。
     /// Requirements: 1.4, 6.1, 6.2
     /// </summary>
     public class ShadowOnlyRendererFeature : ScriptableRendererFeature
@@ -15,6 +16,12 @@ namespace ShadowOnlyShader
         /// Createメソッドで生成される。
         /// </summary>
         private ShadowOnlyRenderPass _renderPass;
+
+        /// <summary>
+        /// 影計算を低解像度RTで事前実行するRenderPass。
+        /// Createメソッドで生成される。
+        /// </summary>
+        private ShadowOnlyShadowResolvePass _resolvePass;
 
         /// <summary>
         /// 深度描画に使用するDepthOnly Material。
@@ -29,13 +36,15 @@ namespace ShadowOnlyShader
         private bool _warnedNoManager;
 
         /// <summary>
-        /// ShadowOnlyRenderPassを生成し、初期設定を行う。
-        /// RenderPassEventをBeforeRenderingOpaquesに設定する。
+        /// ShadowOnlyRenderPassおよびShadowOnlyShadowResolvePassを生成し、初期設定を行う。
         /// </summary>
         public override void Create()
         {
             _renderPass = new ShadowOnlyRenderPass();
             _renderPass.renderPassEvent = RenderPassEvent.BeforeRenderingOpaques;
+
+            _resolvePass = new ShadowOnlyShadowResolvePass();
+            _resolvePass.renderPassEvent = RenderPassEvent.BeforeRenderingTransparents;
 
             // DepthOnly Materialを生成
             CreateDepthOnlyMaterial();
@@ -75,11 +84,17 @@ namespace ShadowOnlyShader
             // Managerが見つかった場合は警告フラグをリセット
             _warnedNoManager = false;
 
-            // RenderPassにManagerの参照を設定
+            // 深度パスにManagerの参照を設定して登録
             _renderPass.SetManager(manager);
-
-            // レンダラーにPassを登録
             renderer.EnqueuePass(_renderPass);
+
+            // Resolveパスを常に登録（パス内部でBlurResolutionScaleを判定し、
+            // 1.0の場合は_ShadowResolveActiveを0に設定して無効化する）
+            if (_resolvePass != null)
+            {
+                _resolvePass.SetManager(manager);
+                renderer.EnqueuePass(_resolvePass);
+            }
         }
 
         /// <summary>
@@ -93,6 +108,8 @@ namespace ShadowOnlyShader
                 _depthOnlyMaterial = null;
             }
 
+            _resolvePass?.ReleaseResolveTexture();
+            _resolvePass = null;
             _renderPass = null;
         }
 

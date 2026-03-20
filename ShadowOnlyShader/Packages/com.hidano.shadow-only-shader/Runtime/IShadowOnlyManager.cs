@@ -55,5 +55,12 @@ namespace ShadowOnlyShader
         /// 複数仮想光源の影を加算合成する際の倍率パラメータ。
         /// </summary>
         float BlendMultiplier { get; set; }
+
+        /// <summary>
+        /// ブラー計算の解像度スケール。
+        /// 1.0で通常解像度（従来動作）、0.5で半分、0.25で1/4の解像度でブラーを計算する。
+        /// 低い値ほど軽量になるが、影の品質が下がる。
+        /// </summary>
+        float BlurResolutionScale { get; set; }
     }
 }

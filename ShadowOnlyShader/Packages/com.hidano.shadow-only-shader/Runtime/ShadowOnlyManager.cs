@@ -28,6 +28,11 @@ namespace ShadowOnlyShader
         [Min(0f)]
         private float _blendMultiplier = 1f;
 
+        [Tooltip("ブラー計算の解像度スケール。1.0で通常解像度、0.5で半分、0.25で1/4。低い値ほど軽量になりますが影がぼやけます")]
+        [SerializeField]
+        [Range(0.1f, 1.0f)]
+        private float _blurResolutionScale = 1.0f;
+
         [Tooltip("影が映り込む床面のRendererを指定します。ここに登録されたオブジェクトの表面に影が描画されます")]
         [SerializeField]
         private List<Renderer> _floorRenderers = new List<Renderer>();
@@ -208,6 +213,13 @@ namespace ShadowOnlyShader
         {
             get => _blendMultiplier;
             set => _blendMultiplier = Mathf.Max(value, 0f);
+        }
+
+        /// <inheritdoc />
+        public float BlurResolutionScale
+        {
+            get => _blurResolutionScale;
+            set => _blurResolutionScale = Mathf.Clamp(value, 0.1f, 1.0f);
         }
 
         #endregion
