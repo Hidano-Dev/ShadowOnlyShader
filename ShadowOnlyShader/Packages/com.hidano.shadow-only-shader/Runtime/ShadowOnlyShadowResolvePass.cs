@@ -70,10 +70,17 @@ namespace ShadowOnlyShader
         /// Resolve RTを確保・再作成する。
         /// カメラ解像度またはスケールが変わった場合に再作成される。
         /// </summary>
+        /// <summary>
+        /// Resolve RTの最小解像度。
+        /// 極端に小さいRTではドローコールのGPU固定オーバーヘッドが
+        /// ピクセルシェーディングコストを上回り、逆に遅くなるため下限を設ける。
+        /// </summary>
+        private const int MinResolveSize = 128;
+
         private RenderTexture EnsureResolveTexture(int cameraWidth, int cameraHeight, float scale)
         {
-            int width = Mathf.Max(1, (int)(cameraWidth * scale));
-            int height = Mathf.Max(1, (int)(cameraHeight * scale));
+            int width = Mathf.Max(MinResolveSize, (int)(cameraWidth * scale));
+            int height = Mathf.Max(MinResolveSize, (int)(cameraHeight * scale));
 
             if (_resolveRT != null && _resolveRT.width == width && _resolveRT.height == height)
             {
@@ -82,7 +89,8 @@ namespace ShadowOnlyShader
 
             ReleaseResolveTexture();
 
-            _resolveRT = new RenderTexture(width, height, 16, RenderTextureFormat.ARGB32);
+            // デプスバッファ不要（ZTest Always + ZWrite Off）— 帯域幅を節約
+            _resolveRT = new RenderTexture(width, height, 0, RenderTextureFormat.ARGB32);
             _resolveRT.filterMode = FilterMode.Bilinear;
             _resolveRT.hideFlags = HideFlags.DontSave;
             _resolveRT.Create();
@@ -146,7 +154,8 @@ namespace ShadowOnlyShader
             // Resolve RTをレンダーターゲットに設定
             cmd.SetRenderTarget(rt);
             cmd.SetViewport(new Rect(0, 0, rt.width, rt.height));
-            cmd.ClearRenderTarget(true, true, new Color(0, 0, 0, 0), 1.0f);
+            // デプスバッファなしのためカラーのみクリア
+            cmd.ClearRenderTarget(false, true, new Color(0, 0, 0, 0));
 
             // ライトごとに個別にドローコールを発行
             // Pass 1（ShadowOnlyResolve）は Blend One One で加算合成されるため、

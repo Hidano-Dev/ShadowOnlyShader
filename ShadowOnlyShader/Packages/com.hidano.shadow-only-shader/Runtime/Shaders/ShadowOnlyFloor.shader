@@ -58,7 +58,7 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             // ライトごとの寄与を加算合成（RTはクリア済み黒から開始）
             Blend One One
             ZWrite Off
-            ZTest LEqual
+            ZTest Always
 
             HLSLPROGRAM
             #pragma vertex vert
