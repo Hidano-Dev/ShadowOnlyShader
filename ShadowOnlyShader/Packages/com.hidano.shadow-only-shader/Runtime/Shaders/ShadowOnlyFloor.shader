@@ -18,8 +18,8 @@ Shader "Hidden/ShadowOnlyShader/Floor"
 
         // ==========================================
         // Pass 0: Display pass（URPが通常のTransparent描画で使用）
-        // _ShadowResolveActive > 0.5 の場合: Resolve結果テクスチャをサンプリング
-        // それ以外: 従来通りフル影計算
+        // Resolve無効時（BlurResolutionScale=1.0）にフル影計算を行う。
+        // Resolve有効時はFloorDisplayシェーダーに切り替わるため、このパスは使用されない。
         // ==========================================
         Pass
         {
@@ -39,28 +39,9 @@ Shader "Hidden/ShadowOnlyShader/Floor"
 
             #include "Packages/com.hidano.shadow-only-shader/Runtime/Shaders/ShadowOnlyFloorCommon.hlsl"
 
-            // Resolve有効フラグ（ShadowOnlyManagerからSetFloatで設定される）
-            float _ShadowResolveActive;
-
-            // Resolve用テクスチャ（グローバルテクスチャとしてResolvePassから設定される）
-            TEXTURE2D(_ShadowResolveTex);
-            SAMPLER(sampler_ShadowResolveTex);
-
             half4 frag_display(Varyings input) : SV_TARGET
             {
-                // uniform分岐: 全フラグメントが同じ値を参照するため、
-                // GPUは未使用側のブランチを完全にスキップする
-                [branch] if (_ShadowResolveActive > 0.5)
-                {
-                    // Resolveが有効: 事前計算済みの低解像度テクスチャからサンプリング
-                    float2 screenUV = input.positionCS.xy / _ScreenParams.xy;
-                    return SAMPLE_TEXTURE2D(_ShadowResolveTex, sampler_ShadowResolveTex, screenUV);
-                }
-                else
-                {
-                    // Resolveが無効: 従来通りフル影計算
-                    return ComputeFloorShadow(input);
-                }
+                return ComputeFloorShadow(input);
             }
             ENDHLSL
         }

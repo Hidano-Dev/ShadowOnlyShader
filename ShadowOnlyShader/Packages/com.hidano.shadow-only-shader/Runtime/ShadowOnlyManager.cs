@@ -52,9 +52,23 @@ namespace ShadowOnlyShader
         private readonly List<IVirtualLight> _virtualLightsInterface = new List<IVirtualLight>();
 
         /// <summary>
-        /// 自動生成された床面用Material。
+        /// 自動生成された床面用Material（フル影計算シェーダー）。
+        /// Resolve無効時にフロアRendererに割り当てられる。
+        /// Resolve有効時はResolve Passの描画にも使用される。
         /// </summary>
         private Material _floorMaterial;
+
+        /// <summary>
+        /// Resolve有効時に使用するDisplay用Material。
+        /// 影計算コードを一切含まない軽量シェーダーで、
+        /// ResolvePassの事前計算結果テクスチャをサンプリングするだけ。
+        /// </summary>
+        private Material _floorMaterialDisplay;
+
+        /// <summary>
+        /// 前フレームのResolve有効状態（状態変化検出用）。
+        /// </summary>
+        private bool _wasResolveActive;
 
         /// <summary>
         /// 全VirtualLight共有の深度Texture2DArray。
@@ -364,6 +378,30 @@ namespace ShadowOnlyShader
             _floorMaterial = new Material(shader);
             _floorMaterial.hideFlags = HideFlags.DontSave;
             _floorMaterialDirty = true;
+
+            // Display用マテリアルの生成（Resolve有効時のテクスチャサンプリング専用）
+            CreateFloorDisplayMaterial();
+        }
+
+        /// <summary>
+        /// Resolve有効時に使用するDisplay用Materialを生成する。
+        /// 影計算コードを含まない軽量シェーダーを使用する。
+        /// </summary>
+        private void CreateFloorDisplayMaterial()
+        {
+            if (_floorMaterialDisplay != null) return;
+
+            var shader = Shader.Find("Hidden/ShadowOnlyShader/FloorDisplay");
+            if (shader == null)
+            {
+                Debug.LogWarning(
+                    "[ShadowOnlyShader] FloorDisplay シェーダーが見つかりません。" +
+                    "BlurResolutionScale による軽量化が無効になります。");
+                return;
+            }
+
+            _floorMaterialDisplay = new Material(shader);
+            _floorMaterialDisplay.hideFlags = HideFlags.DontSave;
         }
 
         /// <summary>
@@ -375,6 +413,12 @@ namespace ShadowOnlyShader
             {
                 DestroyImmediate(_floorMaterial);
                 _floorMaterial = null;
+            }
+
+            if (_floorMaterialDisplay != null)
+            {
+                DestroyImmediate(_floorMaterialDisplay);
+                _floorMaterialDisplay = null;
             }
 
             ReleaseDepthArrayTexture();
@@ -502,8 +546,6 @@ namespace ShadowOnlyShader
             // ブラー品質キーワードの切り替え
             UpdateBlurQualityKeywords();
 
-            // Resolve解像度スケールキーワードの切り替え
-            UpdateResolveKeyword();
         }
 
         /// <summary>
@@ -535,28 +577,22 @@ namespace ShadowOnlyShader
         }
 
         /// <summary>
-        /// Resolve解像度スケールに応じたシェーダーuniform変数を設定する。
-        /// _ShadowResolveActive > 0.5 の場合、Display Pass（Pass 0）は
-        /// Resolve結果テクスチャをサンプリングするランタイム分岐を取る。
-        /// LateUpdateで設定されるため、レンダリング前に確定する。
-        /// </summary>
-        private void UpdateResolveKeyword()
-        {
-            if (_floorMaterial == null) return;
-
-            _floorMaterial.SetFloat("_ShadowResolveActive",
-                _blurResolutionScale < 0.999f ? 1.0f : 0.0f);
-        }
-
-        /// <summary>
-        /// 床面RendererにFloorMaterialを自動割り当てする。
-        /// dirtyフラグが立っている場合のみ実行される（Material作成時・FloorRenderer追加時）。
+        /// 床面RendererにMaterialを自動割り当てする。
+        /// Resolve有効時はDisplay用Material（テクスチャサンプリングのみ）、
+        /// Resolve無効時はフル影計算Materialを割り当てる。
+        /// dirtyフラグが立っている場合のみ実行される（Material作成時・FloorRenderer追加時・Resolve状態変化時）。
         /// nullまたは破棄済みのRendererはスキップする。
         /// </summary>
         public void AssignFloorMaterial()
         {
             if (!_floorMaterialDirty) return;
             if (_floorMaterial == null) return;
+
+            // Resolve有効時はDisplay用Material、無効時はフル影計算Materialを使用
+            bool resolveActive = _blurResolutionScale < 0.999f;
+            var materialToAssign = (resolveActive && _floorMaterialDisplay != null)
+                ? _floorMaterialDisplay
+                : _floorMaterial;
 
             for (int i = _floorRenderers.Count - 1; i >= 0; i--)
             {
@@ -574,7 +610,7 @@ namespace ShadowOnlyShader
                     continue;
                 }
 
-                renderer.sharedMaterial = _floorMaterial;
+                renderer.sharedMaterial = materialToAssign;
             }
 
             _floorMaterialDirty = false;
@@ -642,6 +678,14 @@ namespace ShadowOnlyShader
         {
             // 深度Texture2DArrayの確認・再作成（解像度変更対応）
             EnsureDepthArrayTexture();
+
+            // Resolve有効/無効の状態変化を検出し、マテリアル切り替えをトリガーする
+            bool isResolveActive = _blurResolutionScale < 0.999f;
+            if (isResolveActive != _wasResolveActive)
+            {
+                _floorMaterialDirty = true;
+                _wasResolveActive = isResolveActive;
+            }
 
             // 毎フレーム、各VirtualLightのパラメータをMaterialに転送する
             UpdateMaterialProperties();
