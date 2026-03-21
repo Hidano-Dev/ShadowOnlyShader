@@ -50,6 +50,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 |-----------|------|
 | Blur Quality | ぼかし品質 (Low / Mid / High) |
 | Blend Multiplier | 影の合成強度 |
+| Blur Resolution Scale | ブラー計算の解像度スケール (0.1〜1.0)。低い値ほど軽量だが影がぼやける |
 | Floor Renderers | 影を表示する床面のリスト |
 
 ### VirtualLight (光源ごとの設定)
@@ -67,17 +68,30 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 | Contact Hardening Strength | PCSS コンタクトハードニングの強度 (0 で無効) |
 | Hue Shift | 色相の回転 (0〜360°) |
 | Chromatic Aberration | 色収差の強さ |
-| Source Light | 色収差の光源参照（設定するとLightの色に応じてフリンジ色が変化） |
+| Source Light | Unity Light との同期（Transform・投影パラメータ・影の濃さ・色収差フリンジ色を自動連動） |
 | Chromatic Aberration Color | 色収差の光源色（Source Light 未設定時のフォールバック） |
-| Texture Resolution | 深度テクスチャの解像度 (64〜4096) |
+| Texture Resolution | 深度テクスチャの解像度 (URP Default / 64〜8192) |
 | Caster Root | 影を落とすオブジェクトのルート |
 
 ## 特徴
 
 - **非破壊レンダリング** — 対象オブジェクトの Layer やマテリアルを一切変更しません
-- **複数光源対応** — 仮想光源を複数配置して独立した影を重ね合わせ可能
+- **複数光源対応** — 仮想光源を最大 8 つ配置して独立した影を重ね合わせ可能
 - **SkinnedMeshRenderer 対応** — アニメーション中のキャラクターの影もリアルタイムに描画
+- **低解像度 Resolve** — ブラー等の重い計算を低解像度 RT で事前実行し、GPU 負荷を大幅削減
+- **Source Light 同期** — Unity Light コンポーネントと連動し、位置・投影・影の濃さを自動同期
 - **Gizmo 表示** — Scene ビューで光源の投影範囲を視覚的に確認できます
+
+## アーキテクチャ
+
+```
+ShadowOnlyRendererFeature
+├── ShadowOnlyRenderPass       深度テクスチャ生成 (Texture2DArray)
+├── ShadowOnlyShadowResolvePass  低解像度RTで影を事前計算 (BlurResolutionScale < 1.0 時)
+└── Floor Shader                フロアRendererに影を描画
+    ├── Floor (フル計算)         BlurResolutionScale = 1.0 時に使用
+    └── FloorDisplay (軽量)     Resolve結果をサンプリングするだけ
+```
 
 ## サンプルシーン
 
@@ -98,6 +112,9 @@ light.ShadowAlpha = 0.6f;
 
 // 床面を追加
 manager.AddFloorRenderer(floorRenderer);
+
+// 低解像度Resolveで軽量化
+manager.BlurResolutionScale = 0.5f;
 ```
 
 ## ライセンス
