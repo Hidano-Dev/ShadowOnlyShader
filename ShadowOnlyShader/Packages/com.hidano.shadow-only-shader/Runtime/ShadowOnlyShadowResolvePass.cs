@@ -70,17 +70,10 @@ namespace ShadowOnlyShader
         /// Resolve RTを確保・再作成する。
         /// カメラ解像度またはスケールが変わった場合に再作成される。
         /// </summary>
-        /// <summary>
-        /// Resolve RTの最小解像度。
-        /// 極端に小さいRTではドローコールのGPU固定オーバーヘッドが
-        /// ピクセルシェーディングコストを上回り、逆に遅くなるため下限を設ける。
-        /// </summary>
-        private const int MinResolveSize = 128;
-
         private RenderTexture EnsureResolveTexture(int cameraWidth, int cameraHeight, float scale)
         {
-            int width = Mathf.Max(MinResolveSize, (int)(cameraWidth * scale));
-            int height = Mathf.Max(MinResolveSize, (int)(cameraHeight * scale));
+            int width = Mathf.Max(1, (int)(cameraWidth * scale));
+            int height = Mathf.Max(1, (int)(cameraHeight * scale));
 
             if (_resolveRT != null && _resolveRT.width == width && _resolveRT.height == height)
             {
@@ -151,17 +144,18 @@ namespace ShadowOnlyShader
         {
             var rt = data.resolveTexture;
 
-            // Resolve RTをレンダーターゲットに設定
+            // --- セットアップ計測 ---
+            cmd.BeginSample("Resolve_Setup");
             cmd.SetRenderTarget(rt);
             cmd.SetViewport(new Rect(0, 0, rt.width, rt.height));
-            // デプスバッファなしのためカラーのみクリア
             cmd.ClearRenderTarget(false, true, new Color(0, 0, 0, 0));
+            cmd.EndSample("Resolve_Setup");
 
-            // ライトごとに個別にドローコールを発行
-            // Pass 1（ShadowOnlyResolve）は Blend One One で加算合成されるため、
-            // 各ライトの寄与が自然に積み重なる。ARGB32フォーマットが[0,1]にクランプする。
+            // --- ライトごとの描画計測 ---
             for (int light = 0; light < data.lightCount; light++)
             {
+                string lightLabel = $"Resolve_Light{light}";
+                cmd.BeginSample(lightLabel);
                 cmd.SetGlobalInt(_resolveLightIndexId, light);
 
                 for (int i = 0; i < data.floorRenderers.Count; i++)
@@ -172,14 +166,16 @@ namespace ShadowOnlyShader
                     int submeshCount = renderer.sharedMaterials.Length;
                     for (int s = 0; s < submeshCount; s++)
                     {
-                        cmd.DrawRenderer(renderer, data.floorMaterial, s, 1); // Pass 1 = ShadowOnlyResolve
+                        cmd.DrawRenderer(renderer, data.floorMaterial, s, 1);
                     }
                 }
+                cmd.EndSample(lightLabel);
             }
 
-            // Resolve結果をグローバルテクスチャとして設定
-            // FloorDisplayシェーダーがこのテクスチャをサンプリングする
+            // --- グローバルテクスチャ設定 ---
+            cmd.BeginSample("Resolve_SetGlobal");
             cmd.SetGlobalTexture(_resolveTexId, rt);
+            cmd.EndSample("Resolve_SetGlobal");
         }
 
         #endregion
