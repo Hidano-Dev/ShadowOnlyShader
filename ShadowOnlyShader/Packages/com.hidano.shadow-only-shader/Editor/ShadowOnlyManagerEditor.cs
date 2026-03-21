@@ -109,7 +109,7 @@ namespace ShadowOnlyShader.Editor
                 floor.transform.localScale = new Vector3(100f, 0.01f, 100f);
 
                 var renderer = floor.GetComponent<Renderer>();
-                manager.RegisterFloorRenderer(renderer);
+                manager.AddFloorRenderer(renderer);
                 EditorUtility.SetDirty(manager);
                 Selection.activeGameObject = floor;
             }
