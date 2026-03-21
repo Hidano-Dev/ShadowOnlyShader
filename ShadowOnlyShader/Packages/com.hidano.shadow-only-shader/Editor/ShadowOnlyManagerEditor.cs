@@ -120,5 +120,14 @@ namespace ShadowOnlyShader.Editor
 
             serializedObject.ApplyModifiedProperties();
         }
+
+        [MenuItem("GameObject/Shadow Only/Shadow Only Manager", false, 10)]
+        private static void CreateShadowOnlyManager()
+        {
+            var go = new GameObject("ShadowOnlyManager");
+            Undo.RegisterCreatedObjectUndo(go, "Create ShadowOnlyManager");
+            go.AddComponent<ShadowOnlyManager>();
+            Selection.activeGameObject = go;
+        }
     }
 }
