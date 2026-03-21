@@ -480,6 +480,90 @@ float3 ComputeShadowWithChromaticAberration(int lightIndex, float3 positionWS, f
 #undef CA_SAMPLES
 
 // ===================================================================
+// 単一ライトの影寄与を計算する関数
+// Resolve Passのライトごと分割描画や、ComputeFloorShadowのループ内部から使用
+// 戻り値: half4(影色寄与, アルファ寄与 × _BlendMultiplier)
+// ===================================================================
+
+half4 ComputeSingleLightContribution(Varyings input, int i)
+{
+    // 色収差の有無で影サンプリング方法を切り替え
+    float chromaticAberration = _ChromaticAberrations[i];
+    float3 shadowRGB;
+
+    if (chromaticAberration > 0.001)
+    {
+        // 色収差あり: RGBチャンネルごとに異なるUV位置でサンプリング
+        shadowRGB = ComputeShadowWithChromaticAberration(i, input.positionWS, chromaticAberration);
+
+        // 光源色による色収差変調
+        float4 caColor = _ChromaticAberrationColors[i];
+        float caColorSum = caColor.r + caColor.g + caColor.b;
+        if (caColorSum > 0.001)
+        {
+            float shadowWeighted = dot(shadowRGB, caColor.rgb) / caColorSum;
+            shadowRGB.r = lerp(shadowWeighted, shadowRGB.r, caColor.r);
+            shadowRGB.g = lerp(shadowWeighted, shadowRGB.g, caColor.g);
+            shadowRGB.b = lerp(shadowWeighted, shadowRGB.b, caColor.b);
+        }
+    }
+    else
+    {
+        // 色収差なし: 通常の影判定
+        float s = ComputeShadow(i, input.positionWS);
+        shadowRGB = float3(s, s, s);
+    }
+
+    // いずれかのチャンネルに影がある場合
+    float shadow = max(shadowRGB.r, max(shadowRGB.g, shadowRGB.b));
+
+    if (shadow <= 0.0)
+    {
+        return half4(0, 0, 0, 0);
+    }
+
+    // 影の色と濃さを取得
+    float4 shadowColor = _ShadowColors[i];
+    float shadowAlpha = _ShadowAlphas[i];
+
+    // カメラ距離アルファ減衰: カメラから遠いほど影が薄くなる
+    float alphaCameraDistanceFactor = _AlphaCameraDistanceFactors[i];
+    if (alphaCameraDistanceFactor > 0.0)
+    {
+        float3 cameraPos = GetCameraPositionWS();
+        float cameraDist = length(input.positionWS - cameraPos);
+        // べき乗で距離カーブを調整
+        float cameraDistPower = _CameraDistancePowers[i];
+        float scaledDist = pow(max(cameraDist, 0.001), cameraDistPower);
+        shadowAlpha *= saturate(1.0 / (1.0 + scaledDist * alphaCameraDistanceFactor));
+    }
+
+    float3 finalColor = shadowColor.rgb;
+
+    // Hue Shift適用（HSV色空間での色相回転）
+    float hueShift = _HueShifts[i];
+    finalColor = ApplyHueShift(finalColor, hueShift);
+
+    // 色収差フリンジ処理
+    float3 contribution = finalColor * shadowRGB;
+
+    float3 fringeDiff = shadowRGB - min(shadowRGB.r, min(shadowRGB.g, shadowRGB.b));
+    float fringeStrength = max(fringeDiff.r, max(fringeDiff.g, fringeDiff.b));
+
+    if (fringeStrength > 0.001)
+    {
+        float3 fringeTint = fringeDiff / fringeStrength;
+        contribution += fringeTint * fringeStrength * 0.5;
+    }
+
+    // アルファ寄与（_BlendMultiplierを含む: ライトごとの加算合成でも結果が同一になる）
+    float avgShadow = (shadowRGB.r + shadowRGB.g + shadowRGB.b) / 3.0;
+    float alphaContribution = shadowAlpha * avgShadow * _BlendMultiplier;
+
+    return half4(contribution, alphaContribution);
+}
+
+// ===================================================================
 // フロアシャドウ計算メイン関数
 // 全ライトの影を合成して最終色を返す
 // ===================================================================
@@ -501,83 +585,12 @@ half4 ComputeFloorShadow(Varyings input)
 
     [loop] for (int i = 0; i < lightCount; i++)
     {
-        // 色収差の有無で影サンプリング方法を切り替え
-        float chromaticAberration = _ChromaticAberrations[i];
-        float3 shadowRGB;
-
-        if (chromaticAberration > 0.001)
-        {
-            // 色収差あり: RGBチャンネルごとに異なるUV位置でサンプリング
-            shadowRGB = ComputeShadowWithChromaticAberration(i, input.positionWS, chromaticAberration);
-
-            // 光源色による色収差変調
-            float4 caColor = _ChromaticAberrationColors[i];
-            float caColorSum = caColor.r + caColor.g + caColor.b;
-            if (caColorSum > 0.001)
-            {
-                float shadowWeighted = dot(shadowRGB, caColor.rgb) / caColorSum;
-                shadowRGB.r = lerp(shadowWeighted, shadowRGB.r, caColor.r);
-                shadowRGB.g = lerp(shadowWeighted, shadowRGB.g, caColor.g);
-                shadowRGB.b = lerp(shadowWeighted, shadowRGB.b, caColor.b);
-            }
-        }
-        else
-        {
-            // 色収差なし: 通常の影判定
-            float s = ComputeShadow(i, input.positionWS);
-            shadowRGB = float3(s, s, s);
-        }
-
-        // いずれかのチャンネルに影がある場合
-        float shadow = max(shadowRGB.r, max(shadowRGB.g, shadowRGB.b));
-
-        if (shadow > 0.0)
-        {
-            // 影の色と濃さを取得
-            float4 shadowColor = _ShadowColors[i];
-            float shadowAlpha = _ShadowAlphas[i];
-
-            // カメラ距離アルファ減衰: カメラから遠いほど影が薄くなる
-            float alphaCameraDistanceFactor = _AlphaCameraDistanceFactors[i];
-            if (alphaCameraDistanceFactor > 0.0)
-            {
-                float3 cameraPos = GetCameraPositionWS();
-                float cameraDist = length(input.positionWS - cameraPos);
-                // べき乗で距離カーブを調整
-                float cameraDistPower = _CameraDistancePowers[i];
-                float scaledDist = pow(max(cameraDist, 0.001), cameraDistPower);
-                shadowAlpha *= saturate(1.0 / (1.0 + scaledDist * alphaCameraDistanceFactor));
-            }
-
-            float3 finalColor = shadowColor.rgb;
-
-            // Hue Shift適用（HSV色空間での色相回転）
-            float hueShift = _HueShifts[i];
-            finalColor = ApplyHueShift(finalColor, hueShift);
-
-            // 色収差フリンジ処理
-            float3 contribution = finalColor * shadowRGB;
-
-            float3 fringeDiff = shadowRGB - min(shadowRGB.r, min(shadowRGB.g, shadowRGB.b));
-            float fringeStrength = max(fringeDiff.r, max(fringeDiff.g, fringeDiff.b));
-
-            if (fringeStrength > 0.001)
-            {
-                float3 fringeTint = fringeDiff / fringeStrength;
-                contribution += fringeTint * fringeStrength * 0.5;
-            }
-
-            // 影の寄与を加算合成
-            totalShadowColor += contribution;
-            float avgShadow = (shadowRGB.r + shadowRGB.g + shadowRGB.b) / 3.0;
-            totalShadowAlpha += shadowAlpha * avgShadow;
-        }
+        half4 lightContrib = ComputeSingleLightContribution(input, i);
+        totalShadowColor += lightContrib.rgb;
+        totalShadowAlpha += lightContrib.a;
     }
 
-    // 合成倍率パラメータで調整
-    totalShadowAlpha *= _BlendMultiplier;
-
-    // アルファを[0,1]にクランプ
+    // アルファを[0,1]にクランプ（_BlendMultiplierは各ライトの寄与に含まれている）
     totalShadowAlpha = saturate(totalShadowAlpha);
 
     // 影がない場合は完全に透明

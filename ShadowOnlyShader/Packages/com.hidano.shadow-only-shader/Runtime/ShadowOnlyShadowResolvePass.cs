@@ -33,6 +33,9 @@ namespace ShadowOnlyShader
             /// <summary>フロア用Material。</summary>
             public Material floorMaterial;
 
+            /// <summary>アクティブなVirtualLightの数。</summary>
+            public int lightCount;
+
             /// <summary>カメラのカラーターゲット（レンダーターゲット復元用）。</summary>
             public RTHandle cameraColorTarget;
 
@@ -51,6 +54,9 @@ namespace ShadowOnlyShader
 
         /// <summary>シェーダーグローバル変数: Resolveテクスチャ。</summary>
         private static readonly int _resolveTexId = Shader.PropertyToID("_ShadowResolveTex");
+
+        /// <summary>シェーダーグローバル変数: ライトごとのResolve描画インデックス。</summary>
+        private static readonly int _resolveLightIndexId = Shader.PropertyToID("_ResolveLightIndex");
 
         /// <summary>
         /// Passで使用するManagerを設定する。
@@ -129,8 +135,9 @@ namespace ShadowOnlyShader
 
         /// <summary>
         /// CommandBufferを使用してResolve描画を実行する共通処理。
-        /// 低解像度RTにフロアRendererをPass 1（Resolve）で描画し、
-        /// グローバルテクスチャを設定する。
+        /// ライトごとに個別にドローコールを発行し、加算ブレンド（Blend One One）で合成する。
+        /// これにより各ドローコールがTexture2DArrayの1スライスのみアクセスし、
+        /// GPU テクスチャキャッシュスラッシングを回避する。
         /// </summary>
         private static void ExecuteResolveCommands(CommandBuffer cmd, PassData data)
         {
@@ -141,17 +148,23 @@ namespace ShadowOnlyShader
             cmd.SetViewport(new Rect(0, 0, rt.width, rt.height));
             cmd.ClearRenderTarget(true, true, new Color(0, 0, 0, 0), 1.0f);
 
-            // フロアRendererをPass 1（ShadowOnlyResolve）で描画
-            // Pass 1は常にフルシャドウ計算を実行する（キーワード _SHADOW_RESOLVE_ACTIVE の影響を受けない）
-            for (int i = 0; i < data.floorRenderers.Count; i++)
+            // ライトごとに個別にドローコールを発行
+            // Pass 1（ShadowOnlyResolve）は Blend One One で加算合成されるため、
+            // 各ライトの寄与が自然に積み重なる。ARGB32フォーマットが[0,1]にクランプする。
+            for (int light = 0; light < data.lightCount; light++)
             {
-                var renderer = data.floorRenderers[i];
-                if (renderer == null) continue;
+                cmd.SetGlobalInt(_resolveLightIndexId, light);
 
-                int submeshCount = renderer.sharedMaterials.Length;
-                for (int s = 0; s < submeshCount; s++)
+                for (int i = 0; i < data.floorRenderers.Count; i++)
                 {
-                    cmd.DrawRenderer(renderer, data.floorMaterial, s, 1); // Pass 1 = ShadowOnlyResolve
+                    var renderer = data.floorRenderers[i];
+                    if (renderer == null) continue;
+
+                    int submeshCount = renderer.sharedMaterials.Length;
+                    for (int s = 0; s < submeshCount; s++)
+                    {
+                        cmd.DrawRenderer(renderer, data.floorMaterial, s, 1); // Pass 1 = ShadowOnlyResolve
+                    }
                 }
             }
 
@@ -180,6 +193,7 @@ namespace ShadowOnlyShader
 
             _legacyPassData.resolveTexture = resolveRT;
             _legacyPassData.floorMaterial = _manager.FloorMaterial;
+            _legacyPassData.lightCount = _manager.ActiveVirtualLightCount;
             CollectFloorRenderers(_legacyPassData);
 
             if (_legacyPassData.floorRenderers.Count == 0)
@@ -228,6 +242,7 @@ namespace ShadowOnlyShader
             {
                 passData.resolveTexture = resolveRT;
                 passData.floorMaterial = _manager.FloorMaterial;
+                passData.lightCount = _manager.ActiveVirtualLightCount;
                 CollectFloorRenderers(passData);
 
                 if (passData.floorRenderers.Count == 0)

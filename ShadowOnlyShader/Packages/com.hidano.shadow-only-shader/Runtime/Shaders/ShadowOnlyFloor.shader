@@ -47,30 +47,34 @@ Shader "Hidden/ShadowOnlyShader/Floor"
         }
 
         // ==========================================
-        // Pass 1: Resolve pass（ShadowOnlyShadowResolvePassが低解像度RTに描画する際に使用）
-        // フルシャドウ計算を実行し、結果を直接書き込む（Blend Off）
+        // Pass 1: Per-light Resolve pass（ShadowOnlyShadowResolvePassがライトごとに描画）
+        // 1ライトずつ描画し、加算ブレンドで合成することで
+        // Texture2DArrayの複数スライス同時アクセスによるキャッシュスラッシングを回避する。
         // ==========================================
         Pass
         {
             Name "ShadowOnlyResolve"
 
-            // Resolve RTに直接書き込み（ブレンドなし）
-            Blend Off
-            ZWrite On
+            // ライトごとの寄与を加算合成（RTはクリア済み黒から開始）
+            Blend One One
+            ZWrite Off
             ZTest LEqual
 
             HLSLPROGRAM
             #pragma vertex vert
-            #pragma fragment frag_resolve
+            #pragma fragment frag_resolve_single
 
             // ブラー品質プリセット切り替え用キーワード
             #pragma multi_compile _ _BLUR_LOW _BLUR_MID _BLUR_HIGH
 
             #include "Packages/com.hidano.shadow-only-shader/Runtime/Shaders/ShadowOnlyFloorCommon.hlsl"
 
-            half4 frag_resolve(Varyings input) : SV_TARGET
+            // ResolvePassからライトごとに設定されるグローバル変数
+            int _ResolveLightIndex;
+
+            half4 frag_resolve_single(Varyings input) : SV_TARGET
             {
-                return ComputeFloorShadow(input);
+                return ComputeSingleLightContribution(input, _ResolveLightIndex);
             }
             ENDHLSL
         }

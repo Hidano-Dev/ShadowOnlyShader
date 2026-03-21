@@ -86,6 +86,12 @@ namespace ShadowOnlyShader
         /// </summary>
         private bool _warnedMultipleManagers;
 
+        /// <summary>
+        /// 現在アクティブなVirtualLightの数（ResolvePassから参照される）。
+        /// UpdateMaterialPropertiesで毎フレーム更新される。
+        /// </summary>
+        internal int ActiveVirtualLightCount { get; private set; }
+
         #endregion
 
         #region Pre-allocated Arrays for SetXxxArray
@@ -512,6 +518,7 @@ namespace ShadowOnlyShader
             }
 
             // 実際の有効な光源数を設定（破棄済みを除外した数）
+            ActiveVirtualLightCount = validLightIndex;
             _floorMaterial.SetInt("_VirtualLightCount", validLightIndex);
 
             // 配列パラメータを一括設定（SetXxx × 8回 → SetXxxArray × 1回に集約）
