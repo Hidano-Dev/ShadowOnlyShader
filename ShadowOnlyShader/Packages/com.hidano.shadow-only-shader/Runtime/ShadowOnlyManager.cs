@@ -31,7 +31,7 @@ namespace ShadowOnlyShader
         [Tooltip("ブラー計算の解像度スケール。1.0で通常解像度、0.5で半分、0.25で1/4。低い値ほど軽量になりますが影がぼやけます")]
         [SerializeField]
         [Range(0.1f, 1.0f)]
-        private float _blurResolutionScale = 1.0f;
+        private float _blurResolutionScale = 0.5f;
 
         [Tooltip("影が映り込む床面のRendererを指定します。ここに登録されたオブジェクトの表面に影が描画されます")]
         [SerializeField]

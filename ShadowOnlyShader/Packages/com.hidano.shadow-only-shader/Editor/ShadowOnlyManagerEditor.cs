@@ -15,6 +15,8 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _blurResolutionScale;
         private SerializedProperty _floorRenderers;
 
+        private bool _showAdvanced;
+
         private void OnEnable()
         {
             _blurQuality = serializedObject.FindProperty("_blurQuality");
@@ -33,7 +35,18 @@ namespace ShadowOnlyShader.Editor
             EditorGUILayout.LabelField("グローバルパラメータ", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_blurQuality);
             EditorGUILayout.PropertyField(_blendMultiplier);
-            EditorGUILayout.PropertyField(_blurResolutionScale);
+
+            // 詳細設定（折りたたみ）
+            _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "詳細設定", true);
+            if (_showAdvanced)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(_blurResolutionScale,
+                    new GUIContent("ブラー解像度スケール",
+                        "影のブラー計算の解像度。低い値ほど軽量ですが影がぼやけます。" +
+                        "通常は 0.5（デフォルト）で十分です。"));
+                EditorGUI.indentLevel--;
+            }
 
             EditorGUILayout.Space(8);
 
