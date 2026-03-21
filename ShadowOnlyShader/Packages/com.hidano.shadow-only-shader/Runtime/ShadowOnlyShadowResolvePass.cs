@@ -232,6 +232,15 @@ namespace ShadowOnlyShader
         {
             if (!ShouldExecute())
             {
+                // 60フレームに1回だけログ出力（スパム防止）
+                if (Time.frameCount % 60 == 0)
+                {
+                    Debug.Log($"[ResolvePass] ShouldExecute=false | " +
+                        $"manager={(_manager != null)} " +
+                        $"scale={_manager?.BlurResolutionScale:F2} " +
+                        $"floorMat={(_manager?.FloorMaterial != null)} " +
+                        $"floorCount={_manager?.FloorRenderers.Count}");
+                }
                 return;
             }
 
@@ -252,7 +261,19 @@ namespace ShadowOnlyShader
 
                 if (passData.floorRenderers.Count == 0)
                 {
+                    if (Time.frameCount % 60 == 0)
+                    {
+                        Debug.Log("[ResolvePass] floorRenderers.Count == 0 after collect, skipping");
+                    }
                     return;
+                }
+
+                if (Time.frameCount % 60 == 0)
+                {
+                    Debug.Log($"[ResolvePass] EXECUTING | " +
+                        $"lights={passData.lightCount} " +
+                        $"renderers={passData.floorRenderers.Count} " +
+                        $"rtSize={passData.resolveTexture.width}x{passData.resolveTexture.height}");
                 }
 
                 // カメラターゲットの依存宣言（復元用）
