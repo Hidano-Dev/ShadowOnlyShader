@@ -31,22 +31,7 @@ namespace ShadowOnlyShader.Editor
 
             var manager = (ShadowOnlyManager)target;
 
-            // グローバルパラメータ
-            EditorGUILayout.LabelField("グローバルパラメータ", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(_blurQuality);
-            EditorGUILayout.PropertyField(_blendMultiplier);
-
-            // 詳細設定（折りたたみ）
-            _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "詳細設定", true);
-            if (_showAdvanced)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.PropertyField(_blurResolutionScale,
-                    new GUIContent("ブラー解像度スケール",
-                        "影のブラー計算の解像度。低い値ほど軽量ですが影がぼやけます。" +
-                        "通常は 0.5（デフォルト）で十分です。"));
-                EditorGUI.indentLevel--;
-            }
 
             EditorGUILayout.Space(8);
 
@@ -117,6 +102,21 @@ namespace ShadowOnlyShader.Editor
 
             // 床面Renderer
             EditorGUILayout.PropertyField(_floorRenderers, new GUIContent("床面Renderer"));
+
+            EditorGUILayout.Space(8);
+
+            // 詳細設定（折りたたみ）
+            _showAdvanced = EditorGUILayout.Foldout(_showAdvanced, "詳細設定", true);
+            if (_showAdvanced)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(_blendMultiplier);
+                EditorGUILayout.PropertyField(_blurResolutionScale,
+                    new GUIContent("ブラー解像度スケール",
+                        "影のブラー計算の解像度。低い値ほど軽量ですが影がぼやけます。" +
+                        "通常は 0.5（デフォルト）で十分です。"));
+                EditorGUI.indentLevel--;
+            }
 
             serializedObject.ApplyModifiedProperties();
         }
