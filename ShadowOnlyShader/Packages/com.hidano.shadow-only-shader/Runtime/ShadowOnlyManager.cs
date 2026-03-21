@@ -18,7 +18,6 @@ namespace ShadowOnlyShader
 
         #region Serialized Fields
 
-        [Header("グローバルパラメータ")]
         [Tooltip("影のぼかし品質。Low は軽量だが粗く、High は滑らかだが処理負荷が高くなります")]
         [SerializeField]
         private BlurQuality _blurQuality = BlurQuality.Mid;
