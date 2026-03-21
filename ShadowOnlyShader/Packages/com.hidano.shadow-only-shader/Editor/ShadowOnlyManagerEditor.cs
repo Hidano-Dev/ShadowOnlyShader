@@ -31,10 +31,6 @@ namespace ShadowOnlyShader.Editor
 
             var manager = (ShadowOnlyManager)target;
 
-            EditorGUILayout.PropertyField(_blurQuality);
-
-            EditorGUILayout.Space(8);
-
             // 仮想光源セクション
             EditorGUILayout.LabelField("仮想光源", EditorStyles.boldLabel);
 
@@ -102,6 +98,10 @@ namespace ShadowOnlyShader.Editor
 
             // 床面Renderer
             EditorGUILayout.PropertyField(_floorRenderers, new GUIContent("床面Renderer"));
+
+            EditorGUILayout.Space(8);
+
+            EditorGUILayout.PropertyField(_blurQuality);
 
             EditorGUILayout.Space(8);
 
