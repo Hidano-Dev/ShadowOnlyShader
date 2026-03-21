@@ -140,24 +140,53 @@ namespace ShadowOnlyShader
         /// これにより各ドローコールがTexture2DArrayの1スライスのみアクセスし、
         /// GPU テクスチャキャッシュスラッシングを回避する。
         /// </summary>
+        /// <summary>
+        /// Per-light描画とsingle-draw描画の切り替え閾値（ピクセル数）。
+        /// この閾値以下のRT面積ではsingle-draw（Pass 2）を使用し、
+        /// GPUパイプラインの状態変更オーバーヘッドを回避する。
+        /// 閾値以上ではper-light（Pass 1）を使用し、
+        /// Texture2DArrayのキャッシュスラッシングを回避する。
+        /// 目安: 480×270 = 129,600（1080pの1/4解像度相当）
+        /// </summary>
+        private const int PerLightPixelThreshold = 130000;
+
         private static void ExecuteResolveCommands(CommandBuffer cmd, PassData data)
         {
             var rt = data.resolveTexture;
+            int pixelCount = rt.width * rt.height;
+            bool usePerLight = pixelCount >= PerLightPixelThreshold && data.lightCount > 1;
 
-            // --- セットアップ計測 ---
-            cmd.BeginSample("Resolve_Setup");
+            // Resolve RTをレンダーターゲットに設定してクリア
             cmd.SetRenderTarget(rt);
             cmd.SetViewport(new Rect(0, 0, rt.width, rt.height));
             cmd.ClearRenderTarget(false, true, new Color(0, 0, 0, 0));
-            cmd.EndSample("Resolve_Setup");
 
-            // --- ライトごとの描画計測 ---
-            for (int light = 0; light < data.lightCount; light++)
+            if (usePerLight)
             {
-                string lightLabel = $"Resolve_Light{light}";
-                cmd.BeginSample(lightLabel);
-                cmd.SetGlobalInt(_resolveLightIndexId, light);
+                // --- Per-light描画: 大きいRTでキャッシュスラッシングを回避 ---
+                // Pass 1（Blend One One）でライトごとに個別描画
+                for (int light = 0; light < data.lightCount; light++)
+                {
+                    cmd.SetGlobalInt(_resolveLightIndexId, light);
 
+                    for (int i = 0; i < data.floorRenderers.Count; i++)
+                    {
+                        var renderer = data.floorRenderers[i];
+                        if (renderer == null) continue;
+
+                        int submeshCount = renderer.sharedMaterials.Length;
+                        for (int s = 0; s < submeshCount; s++)
+                        {
+                            cmd.DrawRenderer(renderer, data.floorMaterial, s, 1);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // --- Single-draw描画: 小さいRTでGPUオーバーヘッドを最小化 ---
+                // Pass 2（Blend Off）で全ライトを一括描画
+                // RTが小さいためテクスチャキャッシュに全スライスが収まる
                 for (int i = 0; i < data.floorRenderers.Count; i++)
                 {
                     var renderer = data.floorRenderers[i];
@@ -166,16 +195,13 @@ namespace ShadowOnlyShader
                     int submeshCount = renderer.sharedMaterials.Length;
                     for (int s = 0; s < submeshCount; s++)
                     {
-                        cmd.DrawRenderer(renderer, data.floorMaterial, s, 1);
+                        cmd.DrawRenderer(renderer, data.floorMaterial, s, 2); // Pass 2 = SingleDraw
                     }
                 }
-                cmd.EndSample(lightLabel);
             }
 
-            // --- グローバルテクスチャ設定 ---
-            cmd.BeginSample("Resolve_SetGlobal");
+            // Resolve結果をグローバルテクスチャとして設定
             cmd.SetGlobalTexture(_resolveTexId, rt);
-            cmd.EndSample("Resolve_SetGlobal");
         }
 
         #endregion
@@ -270,10 +296,13 @@ namespace ShadowOnlyShader
 
                 if (Time.frameCount % 60 == 0)
                 {
+                    int px = passData.resolveTexture.width * passData.resolveTexture.height;
+                    bool perLight = px >= PerLightPixelThreshold && passData.lightCount > 1;
                     Debug.Log($"[ResolvePass] EXECUTING | " +
                         $"lights={passData.lightCount} " +
                         $"renderers={passData.floorRenderers.Count} " +
-                        $"rtSize={passData.resolveTexture.width}x{passData.resolveTexture.height}");
+                        $"rtSize={passData.resolveTexture.width}x{passData.resolveTexture.height} " +
+                        $"pixels={px} mode={( perLight ? "PerLight" : "SingleDraw")}");
                 }
 
                 // カメラターゲットの依存宣言（復元用）

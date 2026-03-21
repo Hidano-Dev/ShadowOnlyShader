@@ -78,6 +78,35 @@ Shader "Hidden/ShadowOnlyShader/Floor"
             }
             ENDHLSL
         }
+        // ==========================================
+        // Pass 2: Single-draw Resolve pass（小さいRTで全ライトを一括描画）
+        // RTが十分小さい場合、テクスチャキャッシュに全スライスが収まるため
+        // per-light分割の必要がない。ドローコール1回で済みGPUオーバーヘッドを最小化する。
+        // ==========================================
+        Pass
+        {
+            Name "ShadowOnlyResolveSingleDraw"
+
+            // 全ライトの結果を一度に書き込み
+            Blend Off
+            ZWrite Off
+            ZTest Always
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag_resolve_all
+
+            // ブラー品質プリセット切り替え用キーワード
+            #pragma multi_compile _ _BLUR_LOW _BLUR_MID _BLUR_HIGH
+
+            #include "Packages/com.hidano.shadow-only-shader/Runtime/Shaders/ShadowOnlyFloorCommon.hlsl"
+
+            half4 frag_resolve_all(Varyings input) : SV_TARGET
+            {
+                return ComputeFloorShadow(input);
+            }
+            ENDHLSL
+        }
     }
 
     // フォールバックなし - このシェーダーはShadowOnlyManagerから専用で使用される
