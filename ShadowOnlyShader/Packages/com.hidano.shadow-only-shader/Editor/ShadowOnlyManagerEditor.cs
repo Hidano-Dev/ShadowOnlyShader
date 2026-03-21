@@ -13,6 +13,8 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _blurQuality;
         private SerializedProperty _blendMultiplier;
         private SerializedProperty _blurResolutionScale;
+        private SerializedProperty _adaptiveResolution;
+        private SerializedProperty _adaptiveResolutionMinScale;
         private SerializedProperty _floorRenderers;
 
         private bool _showAdvanced;
@@ -22,6 +24,8 @@ namespace ShadowOnlyShader.Editor
             _blurQuality = serializedObject.FindProperty("_blurQuality");
             _blendMultiplier = serializedObject.FindProperty("_blendMultiplier");
             _blurResolutionScale = serializedObject.FindProperty("_blurResolutionScale");
+            _adaptiveResolution = serializedObject.FindProperty("_adaptiveResolution");
+            _adaptiveResolutionMinScale = serializedObject.FindProperty("_adaptiveResolutionMinScale");
             _floorRenderers = serializedObject.FindProperty("_floorRenderers");
         }
 
@@ -130,6 +134,23 @@ namespace ShadowOnlyShader.Editor
                     new GUIContent("ブラー解像度スケール",
                         "影のブラー計算の解像度。低い値ほど軽量ですが影がぼやけます。" +
                         "通常は 0.5（デフォルト）で十分です。"));
+
+                EditorGUILayout.Space(4);
+                EditorGUILayout.PropertyField(_adaptiveResolution,
+                    new GUIContent("適応解像度",
+                        "カメラ距離に応じてResolve RTの解像度を自動調整します。" +
+                        "遠景時のGPU負荷を大幅に削減します。"));
+
+                if (_adaptiveResolution.boolValue)
+                {
+                    EditorGUI.indentLevel++;
+                    EditorGUILayout.PropertyField(_adaptiveResolutionMinScale,
+                        new GUIContent("最小スケール",
+                            "適応解像度の下限。ブラー解像度スケールにこの値を掛けた解像度まで縮小されます。" +
+                            "例: ブラー解像度0.5 × 最小スケール0.1 = 最小で元の5%解像度"));
+                    EditorGUI.indentLevel--;
+                }
+
                 EditorGUI.indentLevel--;
             }
 

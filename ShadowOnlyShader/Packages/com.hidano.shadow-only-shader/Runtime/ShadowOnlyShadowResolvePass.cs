@@ -52,6 +52,12 @@ namespace ShadowOnlyShader
         /// <summary>Resolve用RenderTexture（パスが管理）。</summary>
         private RenderTexture _resolveRT;
 
+        /// <summary>
+        /// 解像度スナップのステップサイズ（ピクセル）。
+        /// RT再作成の頻度を抑えるために離散的な解像度にスナップする。
+        /// </summary>
+        private const int ResolutionSnapStep = 64;
+
         /// <summary>シェーダーグローバル変数: Resolveテクスチャ。</summary>
         private static readonly int _resolveTexId = Shader.PropertyToID("_ShadowResolveTex");
 
@@ -68,13 +74,12 @@ namespace ShadowOnlyShader
 
         /// <summary>
         /// Resolve RTを確保・再作成する。
-        /// カメラ解像度またはスケールが変わった場合に再作成される。
+        /// 解像度が変わった場合のみ再作成される。
         /// </summary>
-        private RenderTexture EnsureResolveTexture(int cameraWidth, int cameraHeight, float scale)
+        /// <param name="width">RTの幅（ピクセル）</param>
+        /// <param name="height">RTの高さ（ピクセル）</param>
+        private RenderTexture EnsureResolveTexture(int width, int height)
         {
-            int width = Mathf.Max(1, (int)(cameraWidth * scale));
-            int height = Mathf.Max(1, (int)(cameraHeight * scale));
-
             if (_resolveRT != null && _resolveRT.width == width && _resolveRT.height == height)
             {
                 return _resolveRT;
@@ -89,6 +94,62 @@ namespace ShadowOnlyShader
             _resolveRT.Create();
 
             return _resolveRT;
+        }
+
+        /// <summary>
+        /// カメラ距離に応じた実効スケールを計算する。
+        /// 適応解像度が有効な場合、カメラと床面の距離から動的にスケールを低減する。
+        /// </summary>
+        /// <param name="camera">現在のカメラ</param>
+        /// <param name="baseScale">ユーザー設定のBlurResolutionScale</param>
+        /// <returns>適用すべき実効スケール</returns>
+        private float ComputeEffectiveScale(Camera camera, float baseScale)
+        {
+            if (!_manager.AdaptiveResolution)
+            {
+                return baseScale;
+            }
+
+            if (!_manager.TryGetFloorBounds(out var bounds))
+            {
+                return baseScale;
+            }
+
+            // カメラから床面Boundsの中心までの距離
+            float distance = Vector3.Distance(camera.transform.position, bounds.center);
+
+            // 基準サイズ: 床面Boundsの対角半径
+            // この距離では床がビューをほぼ覆うため、フル解像度が必要
+            float referenceSize = bounds.extents.magnitude;
+            if (referenceSize < 0.001f)
+            {
+                referenceSize = 1f;
+            }
+
+            // 距離係数: 基準距離以内では1.0、遠くなるほど低下
+            float distanceFactor = Mathf.Clamp(
+                referenceSize / Mathf.Max(distance, 0.001f),
+                _manager.AdaptiveResolutionMinScale,
+                1.0f);
+
+            return baseScale * distanceFactor;
+        }
+
+        /// <summary>
+        /// 実効スケールからResolve RTのピクセルサイズを計算する。
+        /// ResolutionSnapStepの倍数にスナップしてRT再作成の頻度を抑える。
+        /// </summary>
+        private static (int width, int height) ComputeResolveSize(
+            int cameraWidth, int cameraHeight, float effectiveScale)
+        {
+            int width = Mathf.Max(ResolutionSnapStep, (int)(cameraWidth * effectiveScale));
+            int height = Mathf.Max(ResolutionSnapStep, (int)(cameraHeight * effectiveScale));
+
+            // SnapStepの倍数にスナップ（RT再作成の頻度を抑制）
+            width = (width / ResolutionSnapStep) * ResolutionSnapStep;
+            height = (height / ResolutionSnapStep) * ResolutionSnapStep;
+
+            return (width, height);
         }
 
         /// <summary>
@@ -219,8 +280,9 @@ namespace ShadowOnlyShader
             }
 
             var camera = renderingData.cameraData.camera;
-            float scale = _manager.BlurResolutionScale;
-            var resolveRT = EnsureResolveTexture(camera.pixelWidth, camera.pixelHeight, scale);
+            float effectiveScale = ComputeEffectiveScale(camera, _manager.BlurResolutionScale);
+            var (w, h) = ComputeResolveSize(camera.pixelWidth, camera.pixelHeight, effectiveScale);
+            var resolveRT = EnsureResolveTexture(w, h);
 
             _legacyPassData.resolveTexture = resolveRT;
             _legacyPassData.floorMaterial = _manager.FloorMaterial;
@@ -265,8 +327,9 @@ namespace ShadowOnlyShader
             var camera = cameraData.camera;
             var resourceData = frameData.Get<UniversalResourceData>();
 
-            float scale = _manager.BlurResolutionScale;
-            var resolveRT = EnsureResolveTexture(camera.pixelWidth, camera.pixelHeight, scale);
+            float effectiveScale = ComputeEffectiveScale(camera, _manager.BlurResolutionScale);
+            var (w, h) = ComputeResolveSize(camera.pixelWidth, camera.pixelHeight, effectiveScale);
+            var resolveRT = EnsureResolveTexture(w, h);
 
             using (var builder = renderGraph.AddUnsafePass<PassData>(
                 "ShadowOnly Resolve Pass", out var passData))

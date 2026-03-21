@@ -32,6 +32,15 @@ namespace ShadowOnlyShader
         [Range(0.1f, 1.0f)]
         private float _blurResolutionScale = 0.5f;
 
+        [Tooltip("カメラ距離に応じてResolve RTの解像度を自動調整します。遠景時のGPU負荷を大幅に削減します")]
+        [SerializeField]
+        private bool _adaptiveResolution = true;
+
+        [Tooltip("適応解像度の最小スケール。BlurResolutionScaleにこの値を掛けた解像度が下限になります")]
+        [SerializeField]
+        [Range(0.05f, 0.5f)]
+        private float _adaptiveResolutionMinScale = 0.1f;
+
         [Tooltip("影が映り込む床面のRendererを指定します。ここに登録されたオブジェクトの表面に影が描画されます")]
         [SerializeField]
         private List<Renderer> _floorRenderers = new List<Renderer>();
@@ -239,6 +248,26 @@ namespace ShadowOnlyShader
         {
             get => _blurResolutionScale;
             set => _blurResolutionScale = Mathf.Clamp(value, 0.1f, 1.0f);
+        }
+
+        /// <summary>
+        /// カメラ距離に応じたResolve RT解像度の自動調整の有効/無効。
+        /// 有効時、遠景ではResolve RTを自動的に縮小してGPU負荷を削減する。
+        /// </summary>
+        public bool AdaptiveResolution
+        {
+            get => _adaptiveResolution;
+            set => _adaptiveResolution = value;
+        }
+
+        /// <summary>
+        /// 適応解像度の最小スケール係数。
+        /// BlurResolutionScaleにこの値を掛けた解像度が下限になる。
+        /// </summary>
+        public float AdaptiveResolutionMinScale
+        {
+            get => _adaptiveResolutionMinScale;
+            set => _adaptiveResolutionMinScale = Mathf.Clamp(value, 0.05f, 0.5f);
         }
 
         #endregion
@@ -620,6 +649,43 @@ namespace ShadowOnlyShader
             }
 
             _floorMaterialDirty = false;
+        }
+
+        #endregion
+
+        #region 床面Bounds取得
+
+        /// <summary>
+        /// 床面Rendererの合成バウンディングボックスを取得する。
+        /// 適応解像度の距離計算に使用される。
+        /// </summary>
+        /// <param name="bounds">合成されたBounds（有効なRendererがある場合）</param>
+        /// <returns>有効な床面Rendererが1つ以上あればtrue</returns>
+        public bool TryGetFloorBounds(out Bounds bounds)
+        {
+            bounds = default;
+            bool hasValid = false;
+
+            for (int i = 0; i < _floorRenderers.Count; i++)
+            {
+                var r = _floorRenderers[i];
+                if (r == null || !r.gameObject.activeInHierarchy || !r.enabled)
+                {
+                    continue;
+                }
+
+                if (!hasValid)
+                {
+                    bounds = r.bounds;
+                    hasValid = true;
+                }
+                else
+                {
+                    bounds.Encapsulate(r.bounds);
+                }
+            }
+
+            return hasValid;
         }
 
         #endregion
