@@ -206,9 +206,6 @@ namespace ShadowOnlyShader
         {
             for (int lightIndex = 0; lightIndex < data.lightCount; lightIndex++)
             {
-                string depthLabel = $"Depth_Light{lightIndex}";
-                cmd.BeginSample(depthLabel);
-
                 var viewMatrix = data.viewMatrices[lightIndex];
                 var projMatrix = data.projectionMatrices[lightIndex];
                 var casters = data.casterRendererLists[lightIndex];
@@ -237,8 +234,6 @@ namespace ShadowOnlyShader
                         cmd.DrawRenderer(renderer, data.depthOnlyMaterial, s, 0);
                     }
                 }
-
-                cmd.EndSample(depthLabel);
             }
 
             // 元のカメラView/Projection行列を復元する
