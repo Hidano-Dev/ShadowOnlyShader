@@ -99,6 +99,21 @@ namespace ShadowOnlyShader.Editor
             // 床面Renderer
             EditorGUILayout.PropertyField(_floorRenderers, new GUIContent("床面Renderer"));
 
+            if (GUILayout.Button("床面を自動生成"))
+            {
+                var floor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                floor.name = "ShadowOnlyFloor";
+                Undo.RegisterCreatedObjectUndo(floor, "Create Shadow Only Floor");
+                floor.transform.SetParent(manager.transform);
+                floor.transform.localPosition = new Vector3(0f, -0.005f, 0f);
+                floor.transform.localScale = new Vector3(100f, 0.01f, 100f);
+
+                var renderer = floor.GetComponent<Renderer>();
+                manager.RegisterFloorRenderer(renderer);
+                EditorUtility.SetDirty(manager);
+                Selection.activeGameObject = floor;
+            }
+
             EditorGUILayout.Space(8);
 
             EditorGUILayout.PropertyField(_blurQuality);
