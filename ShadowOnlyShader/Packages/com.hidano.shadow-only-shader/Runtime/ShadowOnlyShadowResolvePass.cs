@@ -345,8 +345,12 @@ namespace ShadowOnlyShader
                 passData.resolveTexture = resolveRT;
                 passData.floorMaterial = _manager.FloorMaterial;
                 passData.lightCount = _manager.ActiveVirtualLightCount;
-                passData.cameraViewMatrix = camera.worldToCameraMatrix;
-                passData.cameraProjectionMatrix = camera.projectionMatrix;
+                // URP が実際にカメラ描画に使うView/Projection行列を使用する。
+                // camera.worldToCameraMatrix / camera.projectionMatrix だとアスペクトや
+                // ジッター等で URP の実描画と微妙にずれ、Resolve RT 内の床位置が画面と
+                // 一致しないため、Display サンプリング時にわずかな位置ずれが残る。
+                passData.cameraViewMatrix = cameraData.GetViewMatrix();
+                passData.cameraProjectionMatrix = cameraData.GetProjectionMatrix();
                 CollectFloorRenderers(passData);
 
                 if (passData.floorRenderers.Count == 0)

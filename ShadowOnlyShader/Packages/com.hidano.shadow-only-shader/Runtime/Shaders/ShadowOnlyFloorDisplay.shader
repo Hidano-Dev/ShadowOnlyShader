@@ -51,7 +51,12 @@ Shader "Hidden/ShadowOnlyShader/FloorDisplay"
 
             half4 frag(Varyings input) : SV_TARGET
             {
-                float2 screenUV = input.positionCS.xy / _ScreenParams.xy;
+                // RenderScale を反映した正しいスクリーンUVを取得する。
+                // positionCS.xy / _ScreenParams.xy は RenderScale を考慮しないため、
+                // RenderScale != 1 のとき screenUV が [0,1] からずれて影が縮小・隅寄りになる。
+                // GetNormalizedScreenSpaceUV は内部で _ScaledScreenParams（実描画解像度）を
+                // 使用するため RenderScale に依存せず一致する。
+                float2 screenUV = GetNormalizedScreenSpaceUV(input.positionCS.xy);
                 return SAMPLE_TEXTURE2D(_ShadowResolveTex, sampler_ShadowResolveTex, screenUV);
             }
             ENDHLSL
