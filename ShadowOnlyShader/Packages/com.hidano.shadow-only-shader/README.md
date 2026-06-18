@@ -17,8 +17,10 @@ Unity Package Manager からインストールできます。
 3. 以下の URL を入力:
 
 ```
-https://github.com/HidanoDev/ShadowOnlyShader.git
+https://github.com/Hidano-Dev/ShadowOnlyShader.git?path=ShadowOnlyShader/Packages/com.hidano.shadow-only-shader
 ```
+
+> 特定バージョンに固定する場合は末尾にタグを付けてください（例: `...com.hidano.shadow-only-shader#v1.0.0`）。
 
 ## セットアップ
 
