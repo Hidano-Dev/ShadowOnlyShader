@@ -39,18 +39,19 @@
 
 ## ◯ 次にやること
 
-1. **【要・実機確認】影の位置ずれ修正済み（本セッション・2つの独立した原因）**。
+1. **【解決済み・実機確認OK / v0.4.1】影の位置ずれ修正完了（本セッション・複数の独立原因）**。RenderScale=2・scale=0.5・縦画面で位置・向きとも一致を確認。
    - **原因A（誤修正→撤回済み）**: 当初「手動Yフリップ `#if UNITY_UV_STARTS_AT_TOP { shadowUV.y = 1 - shadowUV.y }` が `GL.GetGPUProjectionMatrix(proj, true)` と二重反転になる」と判断して削除したが**誤り**。`cmd.SetViewProjectionMatrices` による深度RTの実描画はテクスチャY反転を適用しないため、深度RTはスクリーン向き（非反転）で格納される一方、サンプリング行列（`GetGPUProjectionMatrix(proj, true)`）にはY反転が入る。この食い違いを埋めるため手動Yフリップは**必要**。削除すると影が前後（V方向）に反転する（実機で確認）。→ 2箇所とも元に戻した。
    - **原因B（ビューポート未設定・アスペクト比依存ずれ）**: `ShadowOnlyRenderPass.ExecuteDrawCommands` で深度テクスチャに描画する際 `SetViewport` が無く、RenderGraph UnsafePass ではカメラのビューポート（スマホ縦画面のアスペクト比）が残ったまま正方形の深度テクスチャへ描画されていた。`cmd.SetViewport(0,0,width,height)` を `SetRenderTarget` 直後に追加（Resolve パスは元から実施済み）。これがアスペクト比依存ずれの主因。
    - **原因C（位置ずれの主因・確定）**: Resolve→Display 経路で影が「画面左下に小さく」表示されていた。切り分けで `BlurResolutionScale=1.0`（フル Floor シェーダー、ワールド空間直接計算）にすると正しい位置に出ることを確認 → Resolve 経路が原因と確定。`ShadowOnlyShadowResolvePass`（UnsafePass）がカメラVPを自分で設定せず継承前提だったため、床が誤った行列で低解像度RTに描かれ縮小・隅寄りになっていた。`ExecuteResolveCommands` に `cmd.SetViewProjectionMatrices(cameraView, cameraProj)` を追加（PassData にカメラ行列を渡す）。
-   - → Play中に Windows(D3D)・スマホ縦画面アスペクトで scale=0.5（デフォルト）でも影位置が一致するか確認すること。
    - **原因D（RenderScale 非対応・確定）**: Display シェーダーの `screenUV = positionCS.xy / _ScreenParams.xy` が RenderScale を反映していなかった。RenderScale=2 の環境で影が縮小・隅寄りになる主因。RenderScale=1 にすると大きく改善することを実機確認。`GetNormalizedScreenSpaceUV`（内部で `_ScaledScreenParams` を使用）に置換。
    - **原因E（Resolve のカメラ行列不一致・確定）**: RenderScale=1 でも残るわずかなずれ対策。Resolve パスで `camera.worldToCameraMatrix/projectionMatrix` ではなく `UniversalCameraData.GetViewMatrix()/GetProjectionMatrix()`（URP の実描画行列）を使用するよう変更。
    - → 環境: Unity 6000.0.36f1 / URP 17.0.3 / DX11 / Editor Game ビュー / 縦画面 / RenderScale=2。Compatibility Mode 切替は無効（＝Display シェーダー共通部の問題だったため整合）。
    - **【残課題1・性能】** 深度RTが 8192×8192 になっている（1スライス約256MB）。`VirtualLight.TextureResolution` または URP Main Light Shadow Resolution 由来。要設定見直し。
    - **【残課題2・別件】** scale=1.0 で位置は正しいが「影が途切れる」異常が残る。コア側（ライト投影フラスタム範囲 OrthographicSize/Range か深度バイアス／精度）。位置ずれ確定後に対応予定。
-2. （任意）package.json の version を上げ、Package Manager Update での反映を容易にする。
-3. 変更一式を commit & push し、実行プロジェクト側で再取得。
+2. **【残課題1・性能】** 深度RTが 8192×8192 になっている（1スライス約256MB）。`VirtualLight.TextureResolution` または URP Main Light Shadow Resolution 由来。要設定見直し。
+3. **【残課題2・要確認】** 過去セッションで見えていた「影が途切れる」異常は、位置・向き修正後に再確認したところ解消した模様（ユーザー「正しい状態になった」）。再発する場合はライト投影フラスタム範囲（OrthographicSize/Range）か深度バイアスを疑う。
+4. **【補足】** package.json は `unity: 6000.3` 想定だが実行環境は 6000.0.36f1。動作はしているが、対象 Unity バージョンの整合は要検討。
+5. push 後、実行プロジェクト側で再取得（Package Manager Update / packages-lock.json 該当エントリ削除）。
 
 ## ◯ 関連ファイル
 
