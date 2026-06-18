@@ -39,7 +39,7 @@
 
 ## ◯ 次にやること
 
-1. **【最優先・未解決】影の位置ずれ調査**。残像解消後も残存。Frame Debugger で「ShadowOnly Depth Pass のキャスター描画位置」と「床に落ちる影の位置」を比較し、VirtualLight の配置問題か行列（特に Y反転／深度レンジ）問題かを切り分ける。
+1. **【要・実機確認】影の位置ずれ修正済み（本セッション）**。原因は `ShadowOnlyFloorCommon.hlsl` の手動Yフリップ `#if UNITY_UV_STARTS_AT_TOP { shadowUV.y = 1 - shadowUV.y }`（2箇所）。コミット `f7f9b66` で `_LightVPMatrices` を `GL.GetGPUProjectionMatrix(proj, true)` のGPU変換済みに変更した際、D3D では行列内に既にY反転が含まれるため手動フリップが二重反転となり縦方向にずれていた（GL系は `UNITY_UV_STARTS_AT_TOP` が false で元々無害）。両分岐を削除して解決。→ Play中に Windows(D3D) 実機で影位置が一致するか確認すること。
 2. （任意）package.json の version を上げ、Package Manager Update での反映を容易にする。
 3. 変更一式を commit & push し、実行プロジェクト側で再取得。
 
