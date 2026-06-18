@@ -35,12 +35,6 @@ namespace ShadowOnlyShader
 
             /// <summary>アクティブなVirtualLightの数。</summary>
             public int lightCount;
-
-            /// <summary>カメラのカラーターゲット（レンダーターゲット復元用）。</summary>
-            public TextureHandle cameraColorTarget;
-
-            /// <summary>カメラのデプスターゲット（レンダーターゲット復元用）。</summary>
-            public TextureHandle cameraDepthTarget;
         }
 
         /// <summary>アクティブなShadowOnlyManagerの参照。</summary>
@@ -325,7 +319,6 @@ namespace ShadowOnlyShader
 
             var cameraData = frameData.Get<UniversalCameraData>();
             var camera = cameraData.camera;
-            var resourceData = frameData.Get<UniversalResourceData>();
 
             float effectiveScale = ComputeEffectiveScale(camera, _manager.BlurResolutionScale);
             var (w, h) = ComputeResolveSize(camera.pixelWidth, camera.pixelHeight, effectiveScale);
@@ -344,27 +337,16 @@ namespace ShadowOnlyShader
                     return;
                 }
 
-                // カメラターゲットの依存宣言（復元用）
-                builder.UseTexture(resourceData.activeColorTexture, AccessFlags.Write);
-                builder.UseTexture(resourceData.activeDepthTexture, AccessFlags.Write);
-
-                // レンダーターゲット復元用にRenderGraphのカメラターゲットハンドルを保存。
-                // 非推奨の cameraColorTargetHandle は記録フェーズでは参照できない（例外を投げる）ため、
-                // frameData から取得した TextureHandle を使用する。
-                passData.cameraColorTarget = resourceData.activeColorTexture;
-                passData.cameraDepthTarget = resourceData.activeDepthTexture;
-
+                // このパスは外部のResolve RTにのみ描画し、結果をグローバルテクスチャとして公開する。
+                // カメラのカラーを UseTexture(Write) で宣言するとURPのクリアを奪い残像の原因になるため、
+                // カメラターゲットには触れない（後続のRasterRenderPassが各自再バインドする）。
+                // SetGlobalTexture等のグローバル状態変更を行うため明示的に許可する。
+                builder.AllowGlobalStateModification(true);
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc(static (PassData data, UnsafeGraphContext context) =>
                 {
                     var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
                     ExecuteResolveCommands(cmd, data);
-
-                    // カメラのカラー/デプスターゲットを復元
-                    if (data.cameraColorTarget.IsValid() && data.cameraDepthTarget.IsValid())
-                    {
-                        CoreUtils.SetRenderTarget(cmd, (RTHandle)data.cameraColorTarget, (RTHandle)data.cameraDepthTarget);
-                    }
                 });
             }
         }

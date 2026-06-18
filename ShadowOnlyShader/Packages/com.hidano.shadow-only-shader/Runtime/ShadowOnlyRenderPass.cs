@@ -43,12 +43,6 @@ namespace ShadowOnlyShader
             /// <summary>元のカメラProjection行列（描画後に復元する）。</summary>
             public Matrix4x4 cameraProjectionMatrix;
 
-            /// <summary>カメラのカラーターゲット（RenderGraphパスでのレンダーターゲット復元用）。</summary>
-            public TextureHandle cameraColorTarget;
-
-            /// <summary>カメラのデプスターゲット（RenderGraphパスでのレンダーターゲット復元用）。</summary>
-            public TextureHandle cameraDepthTarget;
-
             /// <summary>Rendererリストのプール（GCアロケーション回避）。</summary>
             private readonly List<List<Renderer>> _rendererListPool = new List<List<Renderer>>();
             private int _poolUsedCount;
@@ -85,8 +79,6 @@ namespace ShadowOnlyShader
                 casterRendererLists.Clear();
                 _poolUsedCount = 0;
                 depthOnlyMaterial = null;
-                cameraColorTarget = default;
-                cameraDepthTarget = default;
             }
         }
 
@@ -308,10 +300,9 @@ namespace ShadowOnlyShader
                 return;
             }
 
-            // カメラのView/Projection行列を取得（描画後に復元するため）
+            // カメラのView/Projection行列を取得（共通データ収集に使用）
             var cameraData = frameData.Get<UniversalCameraData>();
             var camera = cameraData.camera;
-            var resourceData = frameData.Get<UniversalResourceData>();
 
             using (var builder = renderGraph.AddUnsafePass<PassData>(
                 "ShadowOnly Depth Pass", out var passData))
@@ -321,33 +312,18 @@ namespace ShadowOnlyShader
                     return;
                 }
 
-                // カメラのカラー/デプスターゲットをRenderGraphに依存宣言する。
-                // UnsafePassが外部レンダーターゲット（深度RT）に描画した後、
-                // カメラターゲットを正しく復元するために必要。
-                builder.UseTexture(resourceData.activeColorTexture, AccessFlags.Write);
-                builder.UseTexture(resourceData.activeDepthTexture, AccessFlags.Write);
-
-                // レンダーターゲット復元用にRenderGraphのカメラターゲットハンドルを保存。
-                // 非推奨の cameraColorTargetHandle は記録フェーズでは参照できない（例外を投げる）ため、
-                // frameData から取得した TextureHandle を使用する。
-                passData.cameraColorTarget = resourceData.activeColorTexture;
-                passData.cameraDepthTarget = resourceData.activeDepthTexture;
-
-                // UnsafePassのレンダリング関数を設定
+                // このパスは外部の深度Texture2DArrayにのみ描画し、カメラのカラー/デプスには触れない。
+                // カメラのカラーを UseTexture(Write) で宣言すると、BeforeRenderingOpaques の時点で
+                // URP の「最初の書き込み時のクリア」を奪ってしまい、毎フレームのカラークリアが
+                // 行われず前フレームが蓄積する（残像）。よってカメラターゲットは宣言も手動復元もしない。
+                // 後続の RasterRenderPass は各自レンダーターゲットを再バインドするため復元は不要。
+                // レンダーターゲット変更等のグローバル状態変更を行うため明示的に許可する。
+                builder.AllowGlobalStateModification(true);
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc(static (PassData data, UnsafeGraphContext context) =>
                 {
                     var cmd = CommandBufferHelpers.GetNativeCommandBuffer(context.cmd);
                     ExecuteDrawCommands(cmd, data);
-
-                    // UnsafePassではフレームワークによるレンダーターゲットの自動復元が行われないため、
-                    // カメラのカラー/デプスターゲットを明示的に復元する。
-                    // Unity RecorderのRenderTexture経由録画など、カメラが非デフォルトターゲットに
-                    // 描画する場合、この復元がないと後続パスが深度RTに描画されてしまう。
-                    if (data.cameraColorTarget.IsValid() && data.cameraDepthTarget.IsValid())
-                    {
-                        CoreUtils.SetRenderTarget(cmd, (RTHandle)data.cameraColorTarget, (RTHandle)data.cameraDepthTarget);
-                    }
                 });
             }
         }
