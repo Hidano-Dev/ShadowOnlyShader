@@ -44,10 +44,10 @@ namespace ShadowOnlyShader
             public Matrix4x4 cameraProjectionMatrix;
 
             /// <summary>カメラのカラーターゲット（RenderGraphパスでのレンダーターゲット復元用）。</summary>
-            public RTHandle cameraColorTarget;
+            public TextureHandle cameraColorTarget;
 
             /// <summary>カメラのデプスターゲット（RenderGraphパスでのレンダーターゲット復元用）。</summary>
-            public RTHandle cameraDepthTarget;
+            public TextureHandle cameraDepthTarget;
 
             /// <summary>Rendererリストのプール（GCアロケーション回避）。</summary>
             private readonly List<List<Renderer>> _rendererListPool = new List<List<Renderer>>();
@@ -85,8 +85,8 @@ namespace ShadowOnlyShader
                 casterRendererLists.Clear();
                 _poolUsedCount = 0;
                 depthOnlyMaterial = null;
-                cameraColorTarget = null;
-                cameraDepthTarget = null;
+                cameraColorTarget = default;
+                cameraDepthTarget = default;
             }
         }
 
@@ -327,11 +327,11 @@ namespace ShadowOnlyShader
                 builder.UseTexture(resourceData.activeColorTexture, AccessFlags.Write);
                 builder.UseTexture(resourceData.activeDepthTexture, AccessFlags.Write);
 
-                // レンダーターゲット復元用にカメラのRTHandleを保存
-#pragma warning disable CS0618 // RenderGraph環境でのdeprecation警告を抑制（レンダーターゲット復元にはRTHandleが必要）
-                passData.cameraColorTarget = cameraData.renderer.cameraColorTargetHandle;
-                passData.cameraDepthTarget = cameraData.renderer.cameraDepthTargetHandle;
-#pragma warning restore CS0618
+                // レンダーターゲット復元用にRenderGraphのカメラターゲットハンドルを保存。
+                // 非推奨の cameraColorTargetHandle は記録フェーズでは参照できない（例外を投げる）ため、
+                // frameData から取得した TextureHandle を使用する。
+                passData.cameraColorTarget = resourceData.activeColorTexture;
+                passData.cameraDepthTarget = resourceData.activeDepthTexture;
 
                 // UnsafePassのレンダリング関数を設定
                 builder.AllowPassCulling(false);
@@ -344,9 +344,9 @@ namespace ShadowOnlyShader
                     // カメラのカラー/デプスターゲットを明示的に復元する。
                     // Unity RecorderのRenderTexture経由録画など、カメラが非デフォルトターゲットに
                     // 描画する場合、この復元がないと後続パスが深度RTに描画されてしまう。
-                    if (data.cameraColorTarget != null && data.cameraDepthTarget != null)
+                    if (data.cameraColorTarget.IsValid() && data.cameraDepthTarget.IsValid())
                     {
-                        CoreUtils.SetRenderTarget(cmd, data.cameraColorTarget, data.cameraDepthTarget);
+                        CoreUtils.SetRenderTarget(cmd, (RTHandle)data.cameraColorTarget, (RTHandle)data.cameraDepthTarget);
                     }
                 });
             }

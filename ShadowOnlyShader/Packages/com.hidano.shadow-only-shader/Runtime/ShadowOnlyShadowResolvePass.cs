@@ -37,10 +37,10 @@ namespace ShadowOnlyShader
             public int lightCount;
 
             /// <summary>カメラのカラーターゲット（レンダーターゲット復元用）。</summary>
-            public RTHandle cameraColorTarget;
+            public TextureHandle cameraColorTarget;
 
             /// <summary>カメラのデプスターゲット（レンダーターゲット復元用）。</summary>
-            public RTHandle cameraDepthTarget;
+            public TextureHandle cameraDepthTarget;
         }
 
         /// <summary>アクティブなShadowOnlyManagerの参照。</summary>
@@ -348,11 +348,11 @@ namespace ShadowOnlyShader
                 builder.UseTexture(resourceData.activeColorTexture, AccessFlags.Write);
                 builder.UseTexture(resourceData.activeDepthTexture, AccessFlags.Write);
 
-                // レンダーターゲット復元用にカメラのRTHandleを保存
-#pragma warning disable CS0618
-                passData.cameraColorTarget = cameraData.renderer.cameraColorTargetHandle;
-                passData.cameraDepthTarget = cameraData.renderer.cameraDepthTargetHandle;
-#pragma warning restore CS0618
+                // レンダーターゲット復元用にRenderGraphのカメラターゲットハンドルを保存。
+                // 非推奨の cameraColorTargetHandle は記録フェーズでは参照できない（例外を投げる）ため、
+                // frameData から取得した TextureHandle を使用する。
+                passData.cameraColorTarget = resourceData.activeColorTexture;
+                passData.cameraDepthTarget = resourceData.activeDepthTexture;
 
                 builder.AllowPassCulling(false);
                 builder.SetRenderFunc(static (PassData data, UnsafeGraphContext context) =>
@@ -361,9 +361,9 @@ namespace ShadowOnlyShader
                     ExecuteResolveCommands(cmd, data);
 
                     // カメラのカラー/デプスターゲットを復元
-                    if (data.cameraColorTarget != null && data.cameraDepthTarget != null)
+                    if (data.cameraColorTarget.IsValid() && data.cameraDepthTarget.IsValid())
                     {
-                        CoreUtils.SetRenderTarget(cmd, data.cameraColorTarget, data.cameraDepthTarget);
+                        CoreUtils.SetRenderTarget(cmd, (RTHandle)data.cameraColorTarget, (RTHandle)data.cameraDepthTarget);
                     }
                 });
             }
