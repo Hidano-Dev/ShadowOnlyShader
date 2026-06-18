@@ -32,17 +32,21 @@ https://github.com/Hidano-Dev/ShadowOnlyShader.git?path=ShadowOnlyShader/Package
 
 シーンに空の GameObject を作成し、`ShadowOnlyManager` コンポーネントを追加します。
 
-### 3. 仮想光源を追加する
+### 3. 床面を登録する
+
+影を受け取る透明な床メッシュの Renderer を Manager の **Floor Renderers** に追加します。床面のマテリアルは実行時に自動で割り当てられます（Manager の Inspector にある **床面を自動生成** ボタンでも作成できます）。
+
+> 仮想光源を配置する前に床面を先に登録しておくと、次のステップで光源を動かしたときに影が床へ落ちる様子を確認しながら調整できます。
+
+### 4. 仮想光源を追加する
 
 Manager の Inspector から仮想光源 (VirtualLight) を追加します。子 GameObject として生成されるので、位置・回転を調整して影の方向を決めてください。
 
-### 4. キャスターを設定する
+> 影の描画は **Play 中** に更新されます。配灯結果を確認するときは Play モードに入ってください。
+
+### 5. キャスターを設定する
 
 影を落としたいオブジェクト (キャラクターモデルなど) のルート GameObject を VirtualLight の **Caster Root** に指定します。その配下のすべての Renderer (MeshRenderer・SkinnedMeshRenderer) が影の投影元になります。
-
-### 5. 床面を登録する
-
-影を受け取る透明な床メッシュの Renderer を Manager の **Floor Renderers** に追加します。床面のマテリアルは実行時に自動で割り当てられます。
 
 ## 主なパラメータ
 

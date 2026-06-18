@@ -101,7 +101,8 @@ namespace ShadowOnlyShader.Editor
             EditorGUILayout.Space(8);
 
             // 床面Renderer
-            EditorGUILayout.PropertyField(_floorRenderers, new GUIContent("床面Renderer"));
+            EditorGUILayout.PropertyField(_floorRenderers, new GUIContent("床面Renderer",
+                "影が映り込む床面のRendererを指定します。ここに登録されたオブジェクトの表面に影が描画されます。"));
 
             if (GUILayout.Button("床面を自動生成"))
             {
