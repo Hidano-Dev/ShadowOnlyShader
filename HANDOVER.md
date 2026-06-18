@@ -42,7 +42,9 @@
 1. **【要・実機確認】影の位置ずれ修正済み（本セッション・2つの独立した原因）**。
    - **原因A（Yフリップ二重適用）**: `ShadowOnlyFloorCommon.hlsl` の手動Yフリップ `#if UNITY_UV_STARTS_AT_TOP { shadowUV.y = 1 - shadowUV.y }`（2箇所）。コミット `f7f9b66` で `_LightVPMatrices` を `GL.GetGPUProjectionMatrix(proj, true)` のGPU変換済みに変更した際、D3D では行列内に既にY反転が含まれるため手動フリップが二重反転になっていた。両分岐を削除。
    - **原因B（ビューポート未設定・アスペクト比依存ずれ）**: `ShadowOnlyRenderPass.ExecuteDrawCommands` で深度テクスチャに描画する際 `SetViewport` が無く、RenderGraph UnsafePass ではカメラのビューポート（スマホ縦画面のアスペクト比）が残ったまま正方形の深度テクスチャへ描画されていた。`cmd.SetViewport(0,0,width,height)` を `SetRenderTarget` 直後に追加（Resolve パスは元から実施済み）。これがアスペクト比依存ずれの主因。
-   - → Play中に Windows(D3D)・スマホ縦画面アスペクトの両方で影位置がキャスター形状と一致するか確認すること。
+   - **原因C（位置ずれの主因・確定）**: Resolve→Display 経路で影が「画面左下に小さく」表示されていた。切り分けで `BlurResolutionScale=1.0`（フル Floor シェーダー、ワールド空間直接計算）にすると正しい位置に出ることを確認 → Resolve 経路が原因と確定。`ShadowOnlyShadowResolvePass`（UnsafePass）がカメラVPを自分で設定せず継承前提だったため、床が誤った行列で低解像度RTに描かれ縮小・隅寄りになっていた。`ExecuteResolveCommands` に `cmd.SetViewProjectionMatrices(cameraView, cameraProj)` を追加（PassData にカメラ行列を渡す）。
+   - → Play中に Windows(D3D)・スマホ縦画面アスペクトで scale=0.5（デフォルト）でも影位置が一致するか確認すること。
+   - **【残課題】** scale=1.0 で位置は正しくなったが「影が途切れる」など別の異常が残る。原因切り分け中（ライト投影フラスタム範囲＝OrthographicSize/Range 不足か、深度バイアス／精度か）。途切れ方（直線的な境界で切れる＝フラスタム範囲／穴あき＝アクネ／キャスターから離れると消える＝range）の確認待ち。
 2. （任意）package.json の version を上げ、Package Manager Update での反映を容易にする。
 3. 変更一式を commit & push し、実行プロジェクト側で再取得。
 

@@ -35,6 +35,12 @@ namespace ShadowOnlyShader
 
             /// <summary>アクティブなVirtualLightの数。</summary>
             public int lightCount;
+
+            /// <summary>カメラのView行列（Resolve RTを画面と同じ投影で描くために使用）。</summary>
+            public Matrix4x4 cameraViewMatrix;
+
+            /// <summary>カメラのProjection行列（同上）。</summary>
+            public Matrix4x4 cameraProjectionMatrix;
         }
 
         /// <summary>アクティブなShadowOnlyManagerの参照。</summary>
@@ -216,6 +222,13 @@ namespace ShadowOnlyShader
             cmd.SetViewport(new Rect(0, 0, rt.width, rt.height));
             cmd.ClearRenderTarget(false, true, new Color(0, 0, 0, 0));
 
+            // カメラのView/Projection行列を明示的に設定する。
+            // RenderGraph の UnsafePass ではカメラ行列が自動バインドされないため、
+            // これを省くと床が誤った行列で描かれ、Resolve RT 内で縮小・隅寄りになる
+            // （Display シェーダーは screenUV で画面全体[0,1]を前提にサンプリングするため位置ずれになる）。
+            // 画面（カメラカラーターゲット）と同じVPで描くことで screenUV と一致させる。
+            cmd.SetViewProjectionMatrices(data.cameraViewMatrix, data.cameraProjectionMatrix);
+
             if (usePerLight)
             {
                 // --- Per-light描画: 大きいRTでキャッシュスラッシングを回避 ---
@@ -281,6 +294,8 @@ namespace ShadowOnlyShader
             _legacyPassData.resolveTexture = resolveRT;
             _legacyPassData.floorMaterial = _manager.FloorMaterial;
             _legacyPassData.lightCount = _manager.ActiveVirtualLightCount;
+            _legacyPassData.cameraViewMatrix = camera.worldToCameraMatrix;
+            _legacyPassData.cameraProjectionMatrix = camera.projectionMatrix;
             CollectFloorRenderers(_legacyPassData);
 
             if (_legacyPassData.floorRenderers.Count == 0)
@@ -330,6 +345,8 @@ namespace ShadowOnlyShader
                 passData.resolveTexture = resolveRT;
                 passData.floorMaterial = _manager.FloorMaterial;
                 passData.lightCount = _manager.ActiveVirtualLightCount;
+                passData.cameraViewMatrix = camera.worldToCameraMatrix;
+                passData.cameraProjectionMatrix = camera.projectionMatrix;
                 CollectFloorRenderers(passData);
 
                 if (passData.floorRenderers.Count == 0)
