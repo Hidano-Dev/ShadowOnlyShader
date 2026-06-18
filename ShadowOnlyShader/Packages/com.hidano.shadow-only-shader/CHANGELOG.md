@@ -5,6 +5,23 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.5.0] - 2026-06-19
+
+### 変更
+
+- 複数仮想光源の影合成を加算から Screen 合成（`finalAlpha = 1 - Π(1 - aᵢ)`）に変更
+  - 影が重なった部分が加算（`Σ aᵢ`）で過剰に濃くなる問題を解消。個々の影を薄くしても重なりだけ濃くなる現象がなくなり、重なっても不透明度は最大 1 に漸近するのみ
+  - 単一描画パス（`ComputeFloorShadow`）とライトごと Resolve パス（GPU ブレンド `Blend One One, One OneMinusSrcAlpha`）の両経路を整合
+  - 各ライトのアルファ寄与を `[0, 1]` に `saturate` してから合成
+
+### 修正
+
+- 影の位置ずれ・前後（V 方向）反転を修正（複数の独立原因）
+  - RenderGraph UnsafePass で深度パス・Resolve パスにビューポート（`SetViewport`）が未設定で、縦画面等のアスペクト比依存ずれが発生していた問題
+  - Resolve パスがカメラの View/Projection 行列を継承前提で未設定だったため、低解像度 RT 内で床が縮小・隅寄りに描画されていた問題（URP 実描画行列 `GetViewMatrix`/`GetProjectionMatrix` を明示設定）
+  - RenderScale ≠ 1 で Display シェーダーの `screenUV` がずれて影が縮小・隅寄りになる問題（`GetNormalizedScreenSpaceUV` に置換）
+  - 深度 RT のサンプリング行列（`GL.GetGPUProjectionMatrix`）と実描画（`SetViewProjectionMatrices`）の Y 反転の食い違いを補正し、影の前後反転を解消
+
 ## [0.4.0] - 2026-03-22
 
 ### 追加
