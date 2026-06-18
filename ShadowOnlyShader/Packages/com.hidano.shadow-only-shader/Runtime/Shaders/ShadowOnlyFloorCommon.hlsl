@@ -266,12 +266,17 @@ float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
     }
 
     // NDCをUV座標に変換 [-1,1] -> [0,1]
-    // _LightVPMatrices は ShadowOnlyManager 側で GL.GetGPUProjectionMatrix(proj, true) を
-    // 適用済み（深度RenderPass の SetViewProjectionMatrices と同じGPU変換）。
-    // この変換は D3D 等の UNITY_UV_STARTS_AT_TOP プラットフォームで行列内に既にY反転を
-    // 含んでいるため、ここで手動でYを反転すると二重反転になり影が縦方向にずれる。
-    // よってプラットフォーム分岐は行わず、そのままUVとして使用する。
     float2 shadowUV = ndc.xy * 0.5 + 0.5;
+
+    // プラットフォームに応じたY座標の反転。
+    // _LightVPMatrices は GL.GetGPUProjectionMatrix(proj, true) 済みでサンプリング側には
+    // テクスチャY反転が入るが、深度パスの cmd.SetViewProjectionMatrices による実描画では
+    // そのY反転が適用されず、深度RTはスクリーン向き（非反転）で格納される。
+    // この食い違いを UNITY_UV_STARTS_AT_TOP プラットフォーム（D3D等）で補正する。
+    // これを省くと影が前後（V方向）に反転する。
+    #if UNITY_UV_STARTS_AT_TOP
+        shadowUV.y = 1.0 - shadowUV.y;
+    #endif
 
     // 色収差用UVオフセットを適用
     shadowUV += uvOffset;
@@ -428,9 +433,12 @@ float3 ComputeShadowWithChromaticAberration(int lightIndex, float3 positionWS, f
     if (posLS.w <= 0.0)
         return float3(0, 0, 0);
 
-    // _LightVPMatrices は GPU変換済み（ComputeShadowInternal の説明を参照）。
-    // 手動Y反転は二重反転になるため行わない。
     float2 fragUV = (posLS.xy / posLS.w) * 0.5 + 0.5;
+
+    // ComputeShadowInternal と同じY反転補正（深度RTとサンプリング行列のY食い違い対策）
+    #if UNITY_UV_STARTS_AT_TOP
+        fragUV.y = 1.0 - fragUV.y;
+    #endif
 
     // 投影中心からの放射方向
     float2 centerUV = float2(0.5, 0.5);
