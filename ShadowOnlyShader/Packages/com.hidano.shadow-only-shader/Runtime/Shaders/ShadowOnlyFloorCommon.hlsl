@@ -562,9 +562,12 @@ half4 ComputeSingleLightContribution(Varyings input, int i)
         contribution += fringeTint * fringeStrength * 0.5;
     }
 
-    // アルファ寄与（_BlendMultiplierを含む: ライトごとの加算合成でも結果が同一になる）
+    // アルファ寄与（_BlendMultiplierを含む）。
+    // Screen合成（finalAlpha = 1 - Π(1 - a_i)）の前提として各ライトの寄与を[0,1]に収める。
+    // ライトごとResolveパスの GPU ブレンド（Blend One OneMinusSrcAlpha）も
+    // src.a が [0,1] であることを前提とするため、ここで saturate しておく。
     float avgShadow = (shadowRGB.r + shadowRGB.g + shadowRGB.b) / 3.0;
-    float alphaContribution = shadowAlpha * avgShadow * _BlendMultiplier;
+    float alphaContribution = saturate(shadowAlpha * avgShadow * _BlendMultiplier);
 
     return half4(contribution, alphaContribution);
 }
@@ -582,9 +585,14 @@ half4 ComputeFloorShadow(Varyings input)
         return half4(0, 0, 0, 0);
     }
 
-    // 各仮想光源の影を加算合成する
+    // 各仮想光源の影を合成する。
+    // アルファ（影の濃さ）は Screen合成: finalAlpha = 1 - Π(1 - a_i)。
+    // 加算（Σa_i）だと複数光源の影が重なった部分で濃さが足し合わさり、
+    // 個々を薄くしても重なりだけ濃くなってしまう。Screen合成では重なっても
+    // 最大で 1（不透明）に漸近するだけで、単一の影より極端に濃くならない。
+    // 色（tint）は従来どおり加算し、最後に saturate でクランプする。
     float3 totalShadowColor = float3(0, 0, 0);
-    float totalShadowAlpha = 0.0;
+    float transmittance = 1.0; // 各ライトの透過率(1 - a_i)の積
 
     // 光源数の上限をクランプ
     int lightCount = min(_VirtualLightCount, MAX_VIRTUAL_LIGHTS);
@@ -593,11 +601,11 @@ half4 ComputeFloorShadow(Varyings input)
     {
         half4 lightContrib = ComputeSingleLightContribution(input, i);
         totalShadowColor += lightContrib.rgb;
-        totalShadowAlpha += lightContrib.a;
+        transmittance *= (1.0 - lightContrib.a);
     }
 
-    // アルファを[0,1]にクランプ（_BlendMultiplierは各ライトの寄与に含まれている）
-    totalShadowAlpha = saturate(totalShadowAlpha);
+    // Screen合成の最終アルファ（透過率の補数）。各 a_i は[0,1]なので自動的に[0,1]。
+    float totalShadowAlpha = 1.0 - transmittance;
 
     // 影がない場合は完全に透明
     if (totalShadowAlpha <= 0.0)

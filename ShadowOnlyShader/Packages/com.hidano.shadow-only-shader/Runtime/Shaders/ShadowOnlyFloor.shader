@@ -55,8 +55,14 @@ Shader "Hidden/ShadowOnlyShader/Floor"
         {
             Name "ShadowOnlyResolve"
 
-            // ライトごとの寄与を加算合成（RTはクリア済み黒から開始）
-            Blend One One
+            // ライトごとの寄与を合成（RTはクリア済み黒から開始）。
+            // RGB（影色）は加算、アルファ（影の濃さ）は Screen合成にする。
+            //   アルファ: src.a + dst.a*(1 - src.a) = 1 - (1-dst.a)(1-src.a)
+            //   → 各ライトを順に合成しても finalAlpha = 1 - Π(1 - a_i) となり、
+            //     単一描画パス(ComputeFloorShadow)と一致する。重なりが加算で濃く
+            //     なる問題を回避する（src.a は ComputeSingleLightContribution 側で
+            //     [0,1] に saturate 済み）。
+            Blend One One, One OneMinusSrcAlpha
             ZWrite Off
             ZTest Always
 
