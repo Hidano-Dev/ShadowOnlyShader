@@ -205,6 +205,15 @@ namespace ShadowOnlyShader
                 // Texture2DArrayの該当スライスをレンダーターゲットに設定
                 cmd.SetRenderTarget(data.depthArrayTexture, 0, CubemapFace.Unknown, lightIndex);
 
+                // ビューポートを深度テクスチャ全体（正方形）に設定する。
+                // RenderGraph の UnsafePass では SetRenderTarget だけではビューポートが
+                // リセットされず、カメラのビューポート（例: スマホ縦画面のアスペクト比）が
+                // 残ってしまう。その状態で描画すると正方形の深度テクスチャの一部にしか
+                // キャスターが描かれず、フルUVでサンプリングする床面シェーダー側と
+                // 不一致になり、アスペクト比に依存した影の位置ずれが発生する。
+                // Resolve パスと同様に明示的に全面へ設定する。
+                cmd.SetViewport(new Rect(0f, 0f, data.depthArrayTexture.width, data.depthArrayTexture.height));
+
                 // 深度バッファをクリア（深度を最大値=1.0にクリア）
                 cmd.ClearRenderTarget(true, false, Color.clear, 1.0f);
 

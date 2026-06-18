@@ -39,7 +39,10 @@
 
 ## ◯ 次にやること
 
-1. **【要・実機確認】影の位置ずれ修正済み（本セッション）**。原因は `ShadowOnlyFloorCommon.hlsl` の手動Yフリップ `#if UNITY_UV_STARTS_AT_TOP { shadowUV.y = 1 - shadowUV.y }`（2箇所）。コミット `f7f9b66` で `_LightVPMatrices` を `GL.GetGPUProjectionMatrix(proj, true)` のGPU変換済みに変更した際、D3D では行列内に既にY反転が含まれるため手動フリップが二重反転となり縦方向にずれていた（GL系は `UNITY_UV_STARTS_AT_TOP` が false で元々無害）。両分岐を削除して解決。→ Play中に Windows(D3D) 実機で影位置が一致するか確認すること。
+1. **【要・実機確認】影の位置ずれ修正済み（本セッション・2つの独立した原因）**。
+   - **原因A（Yフリップ二重適用）**: `ShadowOnlyFloorCommon.hlsl` の手動Yフリップ `#if UNITY_UV_STARTS_AT_TOP { shadowUV.y = 1 - shadowUV.y }`（2箇所）。コミット `f7f9b66` で `_LightVPMatrices` を `GL.GetGPUProjectionMatrix(proj, true)` のGPU変換済みに変更した際、D3D では行列内に既にY反転が含まれるため手動フリップが二重反転になっていた。両分岐を削除。
+   - **原因B（ビューポート未設定・アスペクト比依存ずれ）**: `ShadowOnlyRenderPass.ExecuteDrawCommands` で深度テクスチャに描画する際 `SetViewport` が無く、RenderGraph UnsafePass ではカメラのビューポート（スマホ縦画面のアスペクト比）が残ったまま正方形の深度テクスチャへ描画されていた。`cmd.SetViewport(0,0,width,height)` を `SetRenderTarget` 直後に追加（Resolve パスは元から実施済み）。これがアスペクト比依存ずれの主因。
+   - → Play中に Windows(D3D)・スマホ縦画面アスペクトの両方で影位置がキャスター形状と一致するか確認すること。
 2. （任意）package.json の version を上げ、Package Manager Update での反映を容易にする。
 3. 変更一式を commit & push し、実行プロジェクト側で再取得。
 
