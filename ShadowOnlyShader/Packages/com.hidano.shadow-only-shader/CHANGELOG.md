@@ -5,6 +5,19 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.6.0] - 2026-07-09
+
+### 追加
+
+- 診断機能（`ShadowOnlyDiagnostics`）
+  - 「影が表示されない」原因になり得る設定・状態を自動検出し、ShadowOnlyManager の Inspector 上部に HelpBox で一覧表示
+  - パイプライン系: URP 未使用 / ShadowOnlyRendererFeature の未登録・無効化 / Quality 設定側 URP アセットの差し替え漏れ（Graphics 設定のみ変更の落とし穴）を検出
+  - 環境系: 必須シェーダー（DepthOnly / Floor / FloorDisplay）の欠落・コンパイル不可、Texture2DArray・深度フォーマット非対応を検出
+  - Manager 系: 非 Play モードの注意喚起 / Manager 無効 / 複数 Manager / `BlendMultiplier = 0` を検出
+  - VirtualLight 系: 光源なし・全て非アクティブ・上限（8 個）超過 / Manager 配下にない光源 / CasterRoot 未設定・Renderer なし・全て非表示 / キャスターが投影フラスタム外 / `ShadowAlpha = 0`（SourceLight の Shadow Strength 由来も明示） / DepthBias 過大 / 深度テクスチャ解像度過大（4096 以上）を検出
+  - 床面系: 未登録 / null 要素 / 全て非表示 / 床がキャスターに含まれる（自己投影） / 床がどの光源の投影範囲にも入っていない / Play 中のマテリアル上書きを検出
+  - 診断は約 2 秒間隔で自動更新され、「再診断」ボタンで即時更新も可能
+
 ## [0.5.0] - 2026-06-19
 
 ### 変更

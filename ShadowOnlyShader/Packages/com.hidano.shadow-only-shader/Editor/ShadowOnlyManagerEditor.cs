@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -5,11 +6,14 @@ namespace ShadowOnlyShader.Editor
 {
     /// <summary>
     /// ShadowOnlyManagerのカスタムInspector。
-    /// 仮想光源の追加・削除UIを提供する。
+    /// 仮想光源の追加・削除UIと、影が表示されない原因の診断表示を提供する。
     /// </summary>
     [CustomEditor(typeof(ShadowOnlyManager))]
     public class ShadowOnlyManagerEditor : UnityEditor.Editor
     {
+        /// <summary>診断の自動再実行間隔（秒）。Inspector再描画のたびに走らないよう間引く。</summary>
+        private const double DiagnosticsIntervalSeconds = 2.0;
+
         private SerializedProperty _blurQuality;
         private SerializedProperty _blendMultiplier;
         private SerializedProperty _blurResolutionScale;
@@ -18,6 +22,9 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _floorRenderers;
 
         private bool _showAdvanced;
+        private bool _showDiagnostics = true;
+        private List<DiagnosticIssue> _diagnostics;
+        private double _lastDiagnosticsTime;
 
         private void OnEnable()
         {
@@ -27,6 +34,9 @@ namespace ShadowOnlyShader.Editor
             _adaptiveResolution = serializedObject.FindProperty("_adaptiveResolution");
             _adaptiveResolutionMinScale = serializedObject.FindProperty("_adaptiveResolutionMinScale");
             _floorRenderers = serializedObject.FindProperty("_floorRenderers");
+
+            // Inspector表示時に診断を即実行する
+            _diagnostics = null;
         }
 
         public override void OnInspectorGUI()
@@ -34,6 +44,9 @@ namespace ShadowOnlyShader.Editor
             serializedObject.Update();
 
             var manager = (ShadowOnlyManager)target;
+
+            // 診断セクション（影が表示されない原因の検出）
+            DrawDiagnostics(manager);
 
             // 仮想光源セクション
             EditorGUILayout.LabelField("仮想光源", EditorStyles.boldLabel);
@@ -156,6 +169,67 @@ namespace ShadowOnlyShader.Editor
             }
 
             serializedObject.ApplyModifiedProperties();
+        }
+
+        /// <summary>
+        /// 診断セクションを描画する。
+        /// 「影が表示されない」原因になり得る設定・状態を検出し、HelpBoxで一覧表示する。
+        /// 診断は一定間隔で自動再実行され、「再診断」ボタンで即時更新もできる。
+        /// </summary>
+        private void DrawDiagnostics(ShadowOnlyManager manager)
+        {
+            double now = EditorApplication.timeSinceStartup;
+            if (_diagnostics == null || now - _lastDiagnosticsTime > DiagnosticsIntervalSeconds)
+            {
+                _diagnostics = ShadowOnlyDiagnostics.Run(manager);
+                _lastDiagnosticsTime = now;
+            }
+
+            int errorCount = 0;
+            int warningCount = 0;
+            foreach (var issue in _diagnostics)
+            {
+                if (issue.Severity == DiagnosticSeverity.Error) errorCount++;
+                else if (issue.Severity == DiagnosticSeverity.Warning) warningCount++;
+            }
+
+            string label = (errorCount == 0 && warningCount == 0)
+                ? "診断: 問題なし"
+                : $"診断: エラー {errorCount}件 / 警告 {warningCount}件";
+
+            _showDiagnostics = EditorGUILayout.Foldout(_showDiagnostics, label, true, EditorStyles.foldoutHeader);
+            if (_showDiagnostics)
+            {
+                if (_diagnostics.Count == 0)
+                {
+                    EditorGUILayout.HelpBox("問題は検出されませんでした。", MessageType.Info);
+                }
+                else
+                {
+                    foreach (var issue in _diagnostics)
+                    {
+                        EditorGUILayout.HelpBox(issue.Message, ToMessageType(issue.Severity));
+                    }
+                }
+
+                if (GUILayout.Button("再診断"))
+                {
+                    _diagnostics = ShadowOnlyDiagnostics.Run(manager);
+                    _lastDiagnosticsTime = now;
+                }
+            }
+
+            EditorGUILayout.Space(8);
+        }
+
+        private static MessageType ToMessageType(DiagnosticSeverity severity)
+        {
+            switch (severity)
+            {
+                case DiagnosticSeverity.Error: return MessageType.Error;
+                case DiagnosticSeverity.Warning: return MessageType.Warning;
+                default: return MessageType.Info;
+            }
         }
 
         [MenuItem("GameObject/Shadow Only/Shadow Only Manager", false, 10)]
