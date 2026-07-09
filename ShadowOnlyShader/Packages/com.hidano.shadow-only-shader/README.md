@@ -75,6 +75,8 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 | Alpha Camera Distance Factor | カメラからの距離に応じた影の減衰量 |
 | Camera Distance Power | カメラ距離効果のカーブ指数 (1=線形) |
 | Contact Hardening Strength | PCSS コンタクトハードニングの強度 (0 で無効) |
+| Contact Darkening Strength | 接地ダークニングの強度。キャスターに近い影 (足元など) を濃くして設置感を強調 (0 で無効) |
+| Contact Darkening Range | 接地ダークニングの効果範囲。小さいほど接地部分だけが濃くなる |
 | Hue Shift | 色相の回転 (0〜360°) |
 | Chromatic Aberration | 色収差の強さ |
 | Source Light | Unity Light との同期（Transform・投影パラメータ・影の濃さ・色収差フリンジ色を自動連動） |
@@ -87,6 +89,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 - **非破壊レンダリング** — 対象オブジェクトの Layer やマテリアルを一切変更しません
 - **複数光源対応** — 仮想光源を最大 32 スライス分（通常光源 1 個 = 1 スライス、Point 光源 1 個 = 6 スライス）配置して独立した影を重ね合わせ可能
 - **ポイントライト対応** — Point モード（90°×6 面のキューブ投影）で全方向に影を投影。Unity の Point Light との自動同期にも対応
+- **接地ダークニング** — キャスターと受影面の距離に応じて影の濃さを変化させ、AO のような設置感を影パイプライン内で表現
 - **SkinnedMeshRenderer 対応** — アニメーション中のキャラクターの影もリアルタイムに描画
 - **低解像度 Resolve** — ブラー等の重い計算を低解像度 RT で事前実行し、GPU 負荷を大幅削減
 - **Source Light 同期** — Unity Light コンポーネントと連動し、位置・投影・影の濃さを自動同期

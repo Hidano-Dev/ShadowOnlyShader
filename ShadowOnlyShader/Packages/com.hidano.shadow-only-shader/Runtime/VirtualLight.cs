@@ -155,6 +155,16 @@ namespace ShadowOnlyShader
         [Min(0f)]
         private float _contactHardeningStrength = 0f;
 
+        [Tooltip("接地ダークニングの強度。キャスターに近い影（足元など）を濃くして設置感を強調します。ベースのShadow Alphaに上乗せする倍率で、0 で無効になります")]
+        [SerializeField]
+        [Min(0f)]
+        private float _contactDarkeningStrength = 0f;
+
+        [Tooltip("接地ダークニングの効果範囲。光源のNear〜Far間を0〜1とした深度差がこの値に達すると効果がゼロになります。小さいほど接地部分だけが濃くなります")]
+        [SerializeField]
+        [Min(0.0001f)]
+        private float _contactDarkeningRange = 0.05f;
+
         [Tooltip("影の解像度。URP Default は URP Asset の Main Light Shadow Resolution を使用します")]
         [SerializeField]
         private int _textureResolution = UseURPResolution;
@@ -351,6 +361,20 @@ namespace ShadowOnlyShader
         {
             get => _contactHardeningStrength;
             set => _contactHardeningStrength = Mathf.Max(value, 0f);
+        }
+
+        /// <inheritdoc />
+        public float ContactDarkeningStrength
+        {
+            get => _contactDarkeningStrength;
+            set => _contactDarkeningStrength = Mathf.Max(value, 0f);
+        }
+
+        /// <inheritdoc />
+        public float ContactDarkeningRange
+        {
+            get => _contactDarkeningRange;
+            set => _contactDarkeningRange = Mathf.Max(value, 0.0001f);
         }
 
         /// <inheritdoc />
@@ -700,6 +724,8 @@ namespace ShadowOnlyShader
             _hueShift = Mathf.Clamp(_hueShift, 0f, 360f);
             _chromaticAberration = Mathf.Max(_chromaticAberration, 0f);
             _contactHardeningStrength = Mathf.Max(_contactHardeningStrength, 0f);
+            _contactDarkeningStrength = Mathf.Max(_contactDarkeningStrength, 0f);
+            _contactDarkeningRange = Mathf.Max(_contactDarkeningRange, 0.0001f);
 
             // Inspector変更時にRendererリストを再収集対象にする
             _renderersDirty = true;

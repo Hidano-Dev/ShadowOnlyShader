@@ -119,6 +119,20 @@ namespace ShadowOnlyShader
         float ContactHardeningStrength { get; set; }
 
         /// <summary>
+        /// 接地ダークニング強度。受影点とキャスターの距離が近い部分（足元など）の影を濃くし、
+        /// 設置感を強調する。ベースのShadowAlphaに上乗せする倍率で、0で無効。
+        /// PCSSと同じブロッカーサーチを使用するため、ぼかしキーワード有効時のみ適用される。
+        /// </summary>
+        float ContactDarkeningStrength { get; set; }
+
+        /// <summary>
+        /// 接地ダークニングの効果範囲。受影点とキャスターの深度差
+        /// （光源のNear〜Far間を0〜1とした正規化深度）がこの値に達すると効果がゼロになる。
+        /// 小さいほど接地部分だけが濃くなる。
+        /// </summary>
+        float ContactDarkeningRange { get; set; }
+
+        /// <summary>
         /// 深度バイアス。シャドウアクネを防止するための深度オフセット。
         /// </summary>
         float DepthBias { get; set; }

@@ -42,6 +42,8 @@ namespace ShadowOnlyShader.Editor
         // Effects
         private SerializedProperty _chromaticAberration;
         private SerializedProperty _contactHardeningStrength;
+        private SerializedProperty _contactDarkeningStrength;
+        private SerializedProperty _contactDarkeningRange;
 
         private static Texture2D _hueSpectrumTexture;
 
@@ -94,6 +96,8 @@ namespace ShadowOnlyShader.Editor
             "_cameraDistancePower",
             "_chromaticAberration",
             "_contactHardeningStrength",
+            "_contactDarkeningStrength",
+            "_contactDarkeningRange",
         };
 
         private void OnEnable()
@@ -118,6 +122,8 @@ namespace ShadowOnlyShader.Editor
 
             _chromaticAberration = serializedObject.FindProperty("_chromaticAberration");
             _contactHardeningStrength = serializedObject.FindProperty("_contactHardeningStrength");
+            _contactDarkeningStrength = serializedObject.FindProperty("_contactDarkeningStrength");
+            _contactDarkeningRange = serializedObject.FindProperty("_contactDarkeningRange");
 
             // Inspector表示時に診断を即実行する
             _diagnostics = null;
@@ -452,6 +458,13 @@ namespace ShadowOnlyShader.Editor
             EditorGUI.indentLevel++;
             EditorGUILayout.PropertyField(_chromaticAberration);
             EditorGUILayout.PropertyField(_contactHardeningStrength);
+            EditorGUILayout.PropertyField(_contactDarkeningStrength);
+            if (_contactDarkeningStrength.floatValue > 0f || _contactDarkeningStrength.hasMultipleDifferentValues)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(_contactDarkeningRange);
+                EditorGUI.indentLevel--;
+            }
             EditorGUI.indentLevel--;
         }
 

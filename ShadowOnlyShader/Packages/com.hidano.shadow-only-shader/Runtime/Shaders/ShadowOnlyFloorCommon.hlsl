@@ -61,6 +61,12 @@ float4 _ChromaticAberrationColors[MAX_VIRTUAL_LIGHTS];
 // コンタクトハードニング（PCSS）強度
 float _ContactHardeningStrengths[MAX_VIRTUAL_LIGHTS];
 
+// 接地ダークニング強度（キャスターに近い受影点の影を濃くする。0で無効）
+float _ContactDarkeningStrengths[MAX_VIRTUAL_LIGHTS];
+
+// 接地ダークニングの効果範囲（正規化深度差。この値で効果がゼロになる）
+float _ContactDarkeningRanges[MAX_VIRTUAL_LIGHTS];
+
 // 各仮想光源のワールド位置（距離ボケ計算用）
 float4 _LightWorldPositions[MAX_VIRTUAL_LIGHTS];
 
@@ -237,15 +243,18 @@ float ComputeShadowAtUV(int lightIndex, float2 shadowUV, float fragmentDepth, fl
 }
 
 // ===================================================================
-// 影判定: プロジェクティブテクスチャマッピングによる深度比較
-// ブラーキーワードが有効な場合はガウシアンサンプリングブラーを適用
-// 距離ボケにも対応（光源からの距離に応じたブラー半径の動的変化）
+// 影サンプリング座標の計算
+// ワールド位置をライト射影空間に変換し、影テクスチャのUV・深度・バイアスを求める
 // ===================================================================
 
-// 影判定の内部実装: uvOffset を加算して影をサンプリングする
-// uvOffset = (0,0) のとき通常の影判定と同じ
-float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
+// 戻り値: 射影範囲内なら true。false の場合、出力値は使用しないこと。
+bool ComputeShadowCoords(int lightIndex, float3 positionWS,
+                         out float2 shadowUV, out float fragmentDepth, out float bias)
 {
+    shadowUV = float2(0.0, 0.0);
+    fragmentDepth = 0.0;
+    bias = 0.0;
+
     // ワールド位置をライト射影空間に変換
     float4x4 lightVP = _LightVPMatrices[lightIndex];
     float4 positionLS = mul(lightVP, float4(positionWS, 1.0));
@@ -253,7 +262,7 @@ float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
     // 射影空間の背面（カメラの後ろ）にあるフラグメントは影なし
     if (positionLS.w <= 0.0)
     {
-        return 0.0;
+        return false;
     }
 
     // 透視除算（クリップ空間からNDCへ）
@@ -262,11 +271,11 @@ float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
     // 射影範囲外の判定（クランプ処理）
     if (ndc.x < -1.0 || ndc.x > 1.0 || ndc.y < -1.0 || ndc.y > 1.0)
     {
-        return 0.0;
+        return false;
     }
 
     // NDCをUV座標に変換 [-1,1] -> [0,1]
-    float2 shadowUV = ndc.xy * 0.5 + 0.5;
+    shadowUV = ndc.xy * 0.5 + 0.5;
 
     // プラットフォームに応じたY座標の反転。
     // _LightVPMatrices は GL.GetGPUProjectionMatrix(proj, true) 済みでサンプリング側には
@@ -278,6 +287,41 @@ float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
         shadowUV.y = 1.0 - shadowUV.y;
     #endif
 
+    // フラグメントの深度値
+    fragmentDepth = ndc.z;
+    #if !UNITY_REVERSED_Z
+        fragmentDepth = fragmentDepth * 0.5 + 0.5;
+    #endif
+
+    bias = _DepthBiases[lightIndex];
+
+    // Perspective投影では深度が非線形（depth ≈ near/d）のため、
+    // NDC空間での深度差がw²に反比例して縮小する。
+    // バイアスを1/w²でスケーリングすることで、投影モードに依存しない
+    // 一貫した深度比較を実現する。Orthographic（w=1）では影響なし。
+    bias /= (positionLS.w * positionLS.w);
+
+    return true;
+}
+
+// ===================================================================
+// 影判定: プロジェクティブテクスチャマッピングによる深度比較
+// ブラーキーワードが有効な場合はガウシアンサンプリングブラーを適用
+// 距離ボケにも対応（光源からの距離に応じたブラー半径の動的変化）
+// ===================================================================
+
+// 影判定の内部実装: uvOffset を加算して影をサンプリングする
+// uvOffset = (0,0) のとき通常の影判定と同じ
+float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
+{
+    float2 shadowUV;
+    float fragmentDepth;
+    float bias;
+    if (!ComputeShadowCoords(lightIndex, positionWS, shadowUV, fragmentDepth, bias))
+    {
+        return 0.0;
+    }
+
     // 色収差用UVオフセットを適用
     shadowUV += uvOffset;
 
@@ -287,20 +331,6 @@ float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
     {
         return 0.0;
     }
-
-    // フラグメントの深度値
-    float fragmentDepth = ndc.z;
-    #if !UNITY_REVERSED_Z
-        fragmentDepth = fragmentDepth * 0.5 + 0.5;
-    #endif
-
-    float bias = _DepthBiases[lightIndex];
-
-    // Perspective投影では深度が非線形（depth ≈ near/d）のため、
-    // NDC空間での深度差がw²に反比例して縮小する。
-    // バイアスを1/w²でスケーリングすることで、投影モードに依存しない
-    // 一貫した深度比較を実現する。Orthographic（w=1）では影響なし。
-    bias /= (positionLS.w * positionLS.w);
 
     // ブラーなし（キーワード未設定時）: 単一サンプル
     #if BLUR_KERNEL_RADIUS == 0
@@ -410,6 +440,53 @@ float ComputeShadowInternal(int lightIndex, float3 positionWS, float2 uvOffset)
 float ComputeShadow(int lightIndex, float3 positionWS)
 {
     return ComputeShadowInternal(lightIndex, positionWS, float2(0, 0));
+}
+
+// ===================================================================
+// 接地ダークニング（コンタクト・ダークニング）
+// 受影点とキャスターの深度差が小さい（= 接地している）部分ほど 1 に近づく
+// 係数 [0,1] を返す。PCSSと同じブロッカーサーチを利用するため、
+// ブラーキーワードが無効な場合は常に 0（効果なし）を返す。
+// ===================================================================
+
+float ComputeContactFactor(int lightIndex, float3 positionWS)
+{
+#if BLUR_KERNEL_RADIUS > 0
+    float2 shadowUV;
+    float fragmentDepth;
+    float bias;
+    if (!ComputeShadowCoords(lightIndex, positionWS, shadowUV, fragmentDepth, bias))
+    {
+        return 0.0;
+    }
+
+    // テクセルサイズの取得（ComputeShadowInternalと同じフォールバック）
+    float4 texSize = _DepthTexSizes[lightIndex];
+    float2 texelSize = texSize.zw;
+    if (texelSize.x < 0.000001)
+    {
+        texelSize = float2(1.0 / 1024.0, 1.0 / 1024.0);
+    }
+
+    // ブロッカーサーチ: PCSSと同様、ベースブラー半径を検索範囲に使用
+    float searchRadius = max(_BlurRadii[lightIndex], 1.0);
+    float2 blockerResult = BlockerSearch(lightIndex, shadowUV, fragmentDepth,
+                                         texelSize, searchRadius, bias);
+
+    if (blockerResult.y < 0.5)
+    {
+        // ブロッカーなし = 接地なし
+        return 0.0;
+    }
+
+    // 平均ブロッカー深度との差が小さいほど接地とみなす
+    float avgBlockerDepth = blockerResult.x / blockerResult.y;
+    float depthDiff = abs(fragmentDepth - avgBlockerDepth);
+    float range = max(_ContactDarkeningRanges[lightIndex], 0.000001);
+    return 1.0 - saturate(depthDiff / range);
+#else
+    return 0.0;
+#endif
 }
 
 // ===================================================================
@@ -531,6 +608,15 @@ half4 ComputeSingleLightContribution(Varyings input, int i)
     // 影の色と濃さを取得
     float4 shadowColor = _ShadowColors[i];
     float shadowAlpha = _ShadowAlphas[i];
+
+    // 接地ダークニング: キャスターに近い受影点（足元など）ほど影を濃くする。
+    // ベースのShadowAlphaを薄めにしておくと「全体は薄く、接地部分だけ濃い」表現になる
+    float contactDarkeningStrength = _ContactDarkeningStrengths[i];
+    if (contactDarkeningStrength > 0.0)
+    {
+        float contactFactor = ComputeContactFactor(i, input.positionWS);
+        shadowAlpha = saturate(shadowAlpha * (1.0 + contactDarkeningStrength * contactFactor));
+    }
 
     // カメラ距離アルファ減衰: カメラから遠いほど影が薄くなる
     float alphaCameraDistanceFactor = _AlphaCameraDistanceFactors[i];

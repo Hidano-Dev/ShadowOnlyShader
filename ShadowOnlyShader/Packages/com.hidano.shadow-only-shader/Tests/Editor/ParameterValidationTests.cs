@@ -293,6 +293,40 @@ namespace ShadowOnlyShader.Tests.Editor
 
         #endregion
 
+        #region ContactDarkening バリデーション
+
+        [Test]
+        public void ContactDarkeningStrength_負の値_0にクランプされる()
+        {
+            _virtualLight.ContactDarkeningStrength = -1f;
+            Assert.AreEqual(0f, _virtualLight.ContactDarkeningStrength, 0.001f,
+                "ContactDarkeningStrengthは0にクランプされるべき");
+        }
+
+        [Test]
+        public void ContactDarkeningStrength_正の値_そのまま設定される()
+        {
+            _virtualLight.ContactDarkeningStrength = 2f;
+            Assert.AreEqual(2f, _virtualLight.ContactDarkeningStrength, 0.001f);
+        }
+
+        [Test]
+        public void ContactDarkeningRange_ゼロ以下_最小値にクランプされる()
+        {
+            _virtualLight.ContactDarkeningRange = 0f;
+            Assert.GreaterOrEqual(_virtualLight.ContactDarkeningRange, 0.0001f,
+                "ContactDarkeningRangeは0.0001以上にクランプされるべき（0除算防止）");
+        }
+
+        [Test]
+        public void ContactDarkeningRange_正の値_そのまま設定される()
+        {
+            _virtualLight.ContactDarkeningRange = 0.1f;
+            Assert.AreEqual(0.1f, _virtualLight.ContactDarkeningRange, 0.0001f);
+        }
+
+        #endregion
+
         #region ShadowOnlyManager バリデーション
 
         [Test]

@@ -139,6 +139,8 @@ namespace ShadowOnlyShader
         private readonly float[] _chromaticAberrations = new float[MaxVirtualLights];
         private readonly Vector4[] _chromaticAberrationColors = new Vector4[MaxVirtualLights];
         private readonly float[] _contactHardeningStrengths = new float[MaxVirtualLights];
+        private readonly float[] _contactDarkeningStrengths = new float[MaxVirtualLights];
+        private readonly float[] _contactDarkeningRanges = new float[MaxVirtualLights];
         private readonly Vector4[] _lightWorldPositions = new Vector4[MaxVirtualLights];
         private readonly Vector4[] _depthTexSizes = new Vector4[MaxVirtualLights];
 
@@ -623,6 +625,8 @@ namespace ShadowOnlyShader
                     _chromaticAberrations[sliceIndex] = vl.ChromaticAberration;
                     _chromaticAberrationColors[sliceIndex] = chromaticAberrationColor;
                     _contactHardeningStrengths[sliceIndex] = vl.ContactHardeningStrength;
+                    _contactDarkeningStrengths[sliceIndex] = vl.ContactDarkeningStrength;
+                    _contactDarkeningRanges[sliceIndex] = vl.ContactDarkeningRange;
                     _lightWorldPositions[sliceIndex] = lightWorldPosition;
                     _depthTexSizes[sliceIndex] = depthTexSize;
 
@@ -648,6 +652,8 @@ namespace ShadowOnlyShader
             _floorMaterial.SetFloatArray("_ChromaticAberrations", _chromaticAberrations);
             _floorMaterial.SetVectorArray("_ChromaticAberrationColors", _chromaticAberrationColors);
             _floorMaterial.SetFloatArray("_ContactHardeningStrengths", _contactHardeningStrengths);
+            _floorMaterial.SetFloatArray("_ContactDarkeningStrengths", _contactDarkeningStrengths);
+            _floorMaterial.SetFloatArray("_ContactDarkeningRanges", _contactDarkeningRanges);
             _floorMaterial.SetVectorArray("_LightWorldPositions", _lightWorldPositions);
             _floorMaterial.SetVectorArray("_DepthTexSizes", _depthTexSizes);
 

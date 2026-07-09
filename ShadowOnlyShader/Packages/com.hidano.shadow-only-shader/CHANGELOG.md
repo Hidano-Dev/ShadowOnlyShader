@@ -7,6 +7,15 @@
 
 ## [0.8.0] - 2026-07-10
 
+### 追加
+
+- 接地ダークニング（コンタクト・ダークニング）を追加
+  - キャスターと受影面の距離が近い部分（足元など）の影を濃くし、AO のような設置感を影パイプライン内で表現する
+  - VirtualLight に `Contact Darkening Strength`（ベースの Shadow Alpha に上乗せする倍率、0 で無効）と `Contact Darkening Range`（Near〜Far 間を 0〜1 とした深度差での効果範囲）を追加。Inspector では Effects フォールドアウト内に表示され、Range は Strength > 0 のときのみ表示される
+  - ベースの Shadow Alpha を薄めに設定すると「全体は薄い影、接地部分だけ濃い」表現が 1 光源で完結する
+  - 実装は PCSS（Contact Hardening）と同じブロッカーサーチを再利用しており、Contact Hardening 有効時の追加コストはごく小さい。ブラーキーワード無効時（BlurQuality キーワードなし）は適用されない
+  - シェーダー内部のライト射影空間変換を `ComputeShadowCoords` ヘルパーに抽出（`ComputeShadowInternal` と接地ダークニングで共有）
+
 ### 変更
 
 - キャスタールートの指定を ShadowOnlyManager での一括指定に変更
