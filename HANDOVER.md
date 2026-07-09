@@ -4,59 +4,56 @@
 
 ## ◯ 今回やったこと
 
-- README 修正: install の git URL を `HidanoDev` → `Hidano-Dev` に訂正し、サブフォルダ指定 `?path=ShadowOnlyShader/Packages/com.hidano.shadow-only-shader` を追加。
-- README セットアップ順を変更: 「床面登録 → 仮想光源追加」の順に。Play中のみ影が更新される旨も追記。
-- `ShadowOnlyManagerEditor.cs`: 「床面Renderer」フィールドの GUIContent に tooltip を追加（他フィールドは既に `[Tooltip]` 済み）。
-- **残像バグ修正（本セッションの主成果）**: `ShadowOnlyRenderPass.cs` / `ShadowOnlyShadowResolvePass.cs` の `RecordRenderGraph` を修正。
-  - 非推奨 `cameraData.renderer.cameraColorTargetHandle`（記録フェーズで例外）を削除。
-  - カメラカラー/デプスへの `UseTexture(AccessFlags.Write)` と手動レンダーターゲット復元を削除。
-  - `builder.AllowGlobalStateModification(true)` を追加。
-  - 不要になった PassData フィールド `cameraColorTarget`/`cameraDepthTarget` を除去。
-  - → ユーザー確認済みで残像解消。
+- **診断機能の新規実装（本セッションの主成果 / v0.5.1）**: 「影が表示されない」原因を自動検出し、ShadowOnlyManager の Inspector 上部に HelpBox 一覧表示する機能を追加。
+  - 新規 `Editor/ShadowOnlyDiagnostics.cs`: 診断ロジック本体（26 項目、Error/Warning/Info の 3 段階）。
+  - `Editor/ShadowOnlyManagerEditor.cs`: Inspector 最上部に「診断」折りたたみセクションを追加。約 2 秒間隔で自動更新＋「再診断」ボタン。
+  - 検出項目の分類: パイプライン系（URP 未使用 / Feature 未登録・無効 / **Quality 側 URP アセット差し替え漏れ**）、環境系（シェーダー欠落・Texture2DArray 非対応等）、Manager 系（非 Play / 無効 / 複数 / BlendMultiplier=0）、VirtualLight 系（光源なし / CasterRoot 未設定 / **キャスターがフラスタム外** / ShadowAlpha=0 / DepthBias 過大 / 解像度 4096 以上）、床面系（未登録 / 自己投影 / フラスタム外 / Play 中マテリアル上書き）。
+- CHANGELOG に 0.5.1 エントリ追加、README にトラブルシューティング節追加。
+- `.meta` はランダム GUID（`f605758f50c248d8b556e713d28b0fdc`）で作成。
+- コンパイル検証: 生成済み csproj に新ファイルを追記して `dotnet build` → 0 エラー / 0 警告。
 
 ## ◯ 決定事項
 
-- このシステムは **Play中のみ動作**（`LateUpdate` 駆動。`ExecuteAlways` 無し）。Editモードの影は URP標準シャドウであり別物。
-- **Light Layer / RenderingLayerMask / cullingMask は一切非対応**。キャスター＝各 VirtualLight の `CasterRoot` 配下、レシーバ＝Manager の `Floor Renderers`。
-- レガシー `Execute`（Compatibility Mode）側の `cameraColorTargetHandle` 参照はスコープ内で正当 → 変更しない。
-- 実行プロジェクトは git 取得版（`Library/PackageCache/...@hash`）。修正反映には push 後に再取得（Package Manager Update、または `Packages/packages-lock.json` の該当エントリ削除で再解決）が必要。
+- 診断は **Editor 専用**（`Editor/` アセンブリ内）。ランタイム API は追加しない。表示先は ShadowOnlyManager のカスタム Inspector。
+- Renderer Feature 登録確認は URP アセット内部フィールド `m_RendererDataList` を**リフレクション**で参照。取得失敗時（URP バージョン差異）は誤検知回避のため該当チェックのみ静かにスキップ。
+- FloorDisplay シェーダー欠落の深刻度は条件付き: BlurResolutionScale < 1.0 なら Error、1.0 なら Warning。
+- フラスタム判定は `GeometryUtility.CalculateFrustumPlanes(vl.ProjectionMatrix * vl.ViewMatrix)` + `TestPlanesAABB`。Edit モードでは行列未更新のため診断側で `vl.UpdateMatrices()` を明示呼び出し（非シリアライズフィールドのみ変更で無害）。
+- 診断結果は Error → Warning → Info の安定ソート（同一深刻度内は検出順維持）。
+- バージョンは **0.5.1**（ユーザーが 0.6.0 から変更。author も Hidano に変更済み）。CHANGELOG 見出しも 0.5.1 に合わせた。
 
 ## ◯ 捨てた選択肢と理由
 
-- 残像対策で `UseTexture(Write)` を残して `AccessFlags.Read` に変える案 → 採用せず。外部RTにしか描かないパスがカメラカラーに依存宣言すること自体が不要かつ有害（`BeforeRenderingOpaques` で URP のクリアを奪う）。宣言ごと削除が正解。
-- 行列ロジック（`GL.GetGPUProjectionMatrix` vs `SetViewProjectionMatrices`）の投機的書き換え → 保留。サンプルでは動く前提のため、位置ずれの原因確定前に触らない。
+- **診断の毎 Repaint 実行** → 不採用。FindObjectsByType・GetComponentsInChildren・リフレクションが毎描画走るのは無駄。2 秒スロットル＋手動「再診断」で十分。
+- **ランタイム（ビルド内）診断 API** → 不採用。トラブルシュートは Editor 上で完結する想定。要望が出たら Runtime 移設を検討。
+- **カメラごとの Renderer 選択（rendererIndex）まで追跡** → 不採用。UniversalAdditionalCameraData の内部フィールド参照が必要で複雑化。URP アセットが参照する全 Renderer を横断チェックする方式で実用上十分。
+- **ShadowColor（白影が白床で見えない等）の検出** → 不採用。誤検知が多く信頼できる判定基準がない。
+- **診断用の Editor テスト追加** → 今回は見送り。シーン構築依存が強く費用対効果が低い。
 
 ## ◯ ハマりどころ
 
-- 影が出なかった主因は **Quality 設定の URP アセット未差し替え**。Graphics 設定だけ直しても、Quality レベル側のアセットが優先されるため Renderer Feature が動かず、警告も出ない（`AddRenderPasses` が呼ばれないため）。
-- `Shadow Alpha` は `Source Light` 設定時に Inspector から隠れ、値は SpotLight の `Shadow Strength` に同期される。
-- 残像（クリアされず前フレーム蓄積）は RenderGraph 経路特有。Feature オフで消えることで package 起因と切り分けた。
+- `dotnet build` が最初に失敗したのは**単に生成済み csproj に新ファイルが未登録**だったため（Unity の csproj はファイル明示列挙）。csproj へ手動追記して検証した。csproj は git 管理外なので追記はそのままで問題なし。
+- Grep 表示で hlsl の 535 行目コメントが `\` に見えたが、実ファイルは `//` で正常（表示アーティファクト）。シェーダーに問題はない。
+- `ProjectionMode` はプロパティ名と型名が同名だが、静的メソッド内の `ProjectionMode.Orthographic` は型として解決されるため問題なし。
 
 ## ◯ 学び
 
-- UnsafePass で外部RTに描く場合、カメラターゲットを `UseTexture(Write)` 宣言すると URP のクリアを奪う。外部RTのみのパスはカメラターゲットに触れず、`AllowGlobalStateModification(true)` + `AllowPassCulling(false)` で十分。
-- `cameraColorTargetHandle` は RenderGraph の記録フェーズでは呼べない（実行スコープ内のみ）。
+- Editor アセンブリは `InternalsVisibleTo("com.hidano.shadow-only-shader.Editor")` 済みのため、`ShadowOnlyManager.MaxVirtualLights` や `VirtualLight.ResolveTextureResolution()` に直接アクセスできる。
+- `GraphicsSettings.currentRenderPipeline` は Quality 側オーバーライドを反映した「実際に使われるアセット」を返す。`QualitySettings.renderPipeline` と `GraphicsSettings.defaultRenderPipeline` の比較で「Graphics だけ直して Quality が古い」落とし穴を機械検出できる（過去セッションで影が出なかった主因）。
+- Unity 生成 csproj + `dotnet build` で Unity を起動せずに構文・型チェックが可能（新規ファイルは csproj へ手動追記が必要）。
 
 ## ◯ 次にやること
 
-1. **【解決済み・実機確認OK / v0.4.1】影の位置ずれ修正完了（本セッション・複数の独立原因）**。RenderScale=2・scale=0.5・縦画面で位置・向きとも一致を確認。
-   - **原因A（誤修正→撤回済み）**: 当初「手動Yフリップ `#if UNITY_UV_STARTS_AT_TOP { shadowUV.y = 1 - shadowUV.y }` が `GL.GetGPUProjectionMatrix(proj, true)` と二重反転になる」と判断して削除したが**誤り**。`cmd.SetViewProjectionMatrices` による深度RTの実描画はテクスチャY反転を適用しないため、深度RTはスクリーン向き（非反転）で格納される一方、サンプリング行列（`GetGPUProjectionMatrix(proj, true)`）にはY反転が入る。この食い違いを埋めるため手動Yフリップは**必要**。削除すると影が前後（V方向）に反転する（実機で確認）。→ 2箇所とも元に戻した。
-   - **原因B（ビューポート未設定・アスペクト比依存ずれ）**: `ShadowOnlyRenderPass.ExecuteDrawCommands` で深度テクスチャに描画する際 `SetViewport` が無く、RenderGraph UnsafePass ではカメラのビューポート（スマホ縦画面のアスペクト比）が残ったまま正方形の深度テクスチャへ描画されていた。`cmd.SetViewport(0,0,width,height)` を `SetRenderTarget` 直後に追加（Resolve パスは元から実施済み）。これがアスペクト比依存ずれの主因。
-   - **原因C（位置ずれの主因・確定）**: Resolve→Display 経路で影が「画面左下に小さく」表示されていた。切り分けで `BlurResolutionScale=1.0`（フル Floor シェーダー、ワールド空間直接計算）にすると正しい位置に出ることを確認 → Resolve 経路が原因と確定。`ShadowOnlyShadowResolvePass`（UnsafePass）がカメラVPを自分で設定せず継承前提だったため、床が誤った行列で低解像度RTに描かれ縮小・隅寄りになっていた。`ExecuteResolveCommands` に `cmd.SetViewProjectionMatrices(cameraView, cameraProj)` を追加（PassData にカメラ行列を渡す）。
-   - **原因D（RenderScale 非対応・確定）**: Display シェーダーの `screenUV = positionCS.xy / _ScreenParams.xy` が RenderScale を反映していなかった。RenderScale=2 の環境で影が縮小・隅寄りになる主因。RenderScale=1 にすると大きく改善することを実機確認。`GetNormalizedScreenSpaceUV`（内部で `_ScaledScreenParams` を使用）に置換。
-   - **原因E（Resolve のカメラ行列不一致・確定）**: RenderScale=1 でも残るわずかなずれ対策。Resolve パスで `camera.worldToCameraMatrix/projectionMatrix` ではなく `UniversalCameraData.GetViewMatrix()/GetProjectionMatrix()`（URP の実描画行列）を使用するよう変更。
-   - → 環境: Unity 6000.0.36f1 / URP 17.0.3 / DX11 / Editor Game ビュー / 縦画面 / RenderScale=2。Compatibility Mode 切替は無効（＝Display シェーダー共通部の問題だったため整合）。
-   - **【残課題1・性能】** 深度RTが 8192×8192 になっている（1スライス約256MB）。`VirtualLight.TextureResolution` または URP Main Light Shadow Resolution 由来。要設定見直し。
-   - **【残課題2・別件】** scale=1.0 で位置は正しいが「影が途切れる」異常が残る。コア側（ライト投影フラスタム範囲 OrthographicSize/Range か深度バイアス／精度）。位置ずれ確定後に対応予定。
-2. **【残課題1・性能】** 深度RTが 8192×8192 になっている（1スライス約256MB）。`VirtualLight.TextureResolution` または URP Main Light Shadow Resolution 由来。要設定見直し。
-3. **【残課題2・要確認】** 過去セッションで見えていた「影が途切れる」異常は、位置・向き修正後に再確認したところ解消した模様（ユーザー「正しい状態になった」）。再発する場合はライト投影フラスタム範囲（OrthographicSize/Range）か深度バイアスを疑う。
-4. **【補足】** package.json は `unity: 6000.3` 想定だが実行環境は 6000.0.36f1。動作はしているが、対象 Unity バージョンの整合は要検討。
-5. push 後、実行プロジェクト側で再取得（Package Manager Update / packages-lock.json 該当エントリ削除）。
+1. **【最優先・要ユーザー確認】Unity Editor 上での診断機能の動作確認**。HelpBox 表示、実際のエラーシーン（Feature 未登録・CasterRoot 未設定等）での検出、Play 中の挙動。未検証なのはここだけ。
+2. **【残課題・性能】** 深度 RT が 8192×8192 になる問題の設定見直し（診断が 4096 以上で警告を出すようにはなったが、根本のデフォルト値是正は未対応）。`VirtualLight.TextureResolution` / URP Main Light Shadow Resolution 由来。
+3. **【補足】** package.json は `unity: 6000.3` 想定だが実行環境は 6000.0.36f1。動作はしているが整合は要検討。
+4. push 後、実行プロジェクト側で再取得（Package Manager Update / packages-lock.json 該当エントリ削除）。
+5. 変更は未コミット。コミット時は新規 2 ファイル（`ShadowOnlyDiagnostics.cs` + `.meta`）を含めること。
 
 ## ◯ 関連ファイル
 
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/ShadowOnlyRenderPass.cs`
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/ShadowOnlyShadowResolvePass.cs`
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Editor/ShadowOnlyManagerEditor.cs`
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/README.md`
-- 影計算本体（位置ずれ調査用）: `Runtime/Shaders/ShadowOnlyFloorCommon.hlsl`, `Runtime/VirtualLight.cs`, `Runtime/ShadowOnlyManager.cs`
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Editor/ShadowOnlyDiagnostics.cs`（新規・診断ロジック本体）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Editor/ShadowOnlyDiagnostics.cs.meta`（新規）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Editor/ShadowOnlyManagerEditor.cs`（診断セクション UI 追加）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/CHANGELOG.md`（0.5.1 エントリ）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/README.md`（トラブルシューティング節）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/package.json`（0.5.1）
