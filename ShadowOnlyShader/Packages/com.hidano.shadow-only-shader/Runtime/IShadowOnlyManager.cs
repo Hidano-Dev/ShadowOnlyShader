@@ -47,6 +47,13 @@ namespace ShadowOnlyShader
         void RemoveFloorRenderer(Renderer renderer);
 
         /// <summary>
+        /// 全仮想光源共通のキャスタールート。
+        /// VirtualLight側でCasterRootが個別指定されていない光源は、このGameObject配下の
+        /// Rendererを影の投影元として使用する。
+        /// </summary>
+        GameObject DefaultCasterRoot { get; set; }
+
+        /// <summary>
         /// ブラー品質プリセット。全仮想光源に共通で適用される。
         /// </summary>
         BlurQuality BlurQuality { get; set; }

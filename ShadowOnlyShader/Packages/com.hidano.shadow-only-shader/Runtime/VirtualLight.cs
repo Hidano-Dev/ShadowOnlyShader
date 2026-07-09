@@ -48,7 +48,7 @@ namespace ShadowOnlyShader
         #region Serialized Fields - Caster
 
         [Header("Caster")]
-        [Tooltip("影を落とすオブジェクトの親。この配下にあるすべてのメッシュが影の元になります")]
+        [Tooltip("この光源だけ影の元を個別に変えたい場合に指定します。未設定の場合はShadowOnlyManagerのDefault Caster Rootが使用されます。指定した場合、その配下にあるすべてのメッシュが影の元になります")]
         [SerializeField]
         private GameObject _casterRoot;
 
@@ -193,6 +193,18 @@ namespace ShadowOnlyShader
         /// CasterRoot変更、階層変更時にtrueになる。
         /// </summary>
         private bool _renderersDirty = true;
+
+        /// <summary>
+        /// 前回CollectRenderersを実行したときの実効キャスタールート。
+        /// ManagerのDefaultCasterRoot変更を毎フレームの比較で検出するために保持する。
+        /// </summary>
+        private GameObject _lastCollectedRoot;
+
+        /// <summary>
+        /// 親階層のShadowOnlyManagerのキャッシュ（Playモード時のみ使用）。
+        /// EffectiveCasterRootの解決で毎フレームGetComponentInParentが走るのを防ぐ。
+        /// </summary>
+        private ShadowOnlyManager _cachedManager;
 
         /// <summary>
         /// 前フレームの同期状態。ランタイムでのSourceLight着脱検出に使用。
@@ -371,7 +383,38 @@ namespace ShadowOnlyShader
         }
 
         /// <inheritdoc />
+        public GameObject EffectiveCasterRoot
+        {
+            get
+            {
+                if (_casterRoot != null) return _casterRoot;
+                var manager = ResolveManager();
+                return manager != null ? manager.DefaultCasterRoot : null;
+            }
+        }
+
+        /// <inheritdoc />
         public IReadOnlyList<Renderer> CasterRenderers => _casterRenderers;
+
+        /// <summary>
+        /// 親階層のShadowOnlyManagerを取得する。
+        /// Editモードでは再親子付けを検出できないためキャッシュせず毎回検索し、
+        /// Playモードではキャッシュを使用する（OnTransformParentChangedで無効化）。
+        /// </summary>
+        private ShadowOnlyManager ResolveManager()
+        {
+#if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                return GetComponentInParent<ShadowOnlyManager>(true);
+            }
+#endif
+            if (_cachedManager == null)
+            {
+                _cachedManager = GetComponentInParent<ShadowOnlyManager>(true);
+            }
+            return _cachedManager;
+        }
 
         #endregion
 
@@ -407,13 +450,17 @@ namespace ShadowOnlyShader
         /// <inheritdoc />
         public void CollectRenderers()
         {
-            if (!_renderersDirty) return;
+            // ManagerのDefaultCasterRoot変更はイベントで通知されないため、
+            // 実効ルートの変化を毎回の呼び出しで検出して再収集する
+            GameObject root = EffectiveCasterRoot;
+            if (!_renderersDirty && root == _lastCollectedRoot) return;
 
             _casterRenderers.Clear();
-            if (_casterRoot != null)
+            if (root != null)
             {
-                _casterRoot.GetComponentsInChildren<Renderer>(_casterRenderers);
+                root.GetComponentsInChildren<Renderer>(_casterRenderers);
             }
+            _lastCollectedRoot = root;
             _renderersDirty = false;
         }
 
@@ -682,6 +729,13 @@ namespace ShadowOnlyShader
         private void OnTransformChildrenChanged()
         {
             // CasterRoot配下の子階層が変更された場合にRendererリストを再収集
+            _renderersDirty = true;
+        }
+
+        private void OnTransformParentChanged()
+        {
+            // 親が変わると所属するManagerも変わり得るため、キャッシュを無効化する
+            _cachedManager = null;
             _renderersDirty = true;
         }
 

@@ -129,12 +129,21 @@ namespace ShadowOnlyShader
         float NormalBias { get; set; }
 
         /// <summary>
-        /// キャスターのルートGameObject。子階層の全Rendererが影の投影元として使用される。
+        /// この光源個別のキャスタールートGameObject（上書き指定）。
+        /// nullの場合は親のShadowOnlyManagerのDefaultCasterRootが使用される。
+        /// 設定した場合はこの光源のみ、その配下の全Rendererが影の投影元として使用される。
         /// </summary>
         GameObject CasterRoot { get; set; }
 
         /// <summary>
-        /// CasterRoot配下から収集されたRendererのリスト（読み取り専用）。
+        /// 実効的なキャスタールート（読み取り専用）。
+        /// CasterRootが設定されていればその値、なければ親Managerの
+        /// DefaultCasterRootを返す（Manager配下にない場合はnull）。
+        /// </summary>
+        GameObject EffectiveCasterRoot { get; }
+
+        /// <summary>
+        /// EffectiveCasterRoot配下から収集されたRendererのリスト（読み取り専用）。
         /// </summary>
         IReadOnlyList<Renderer> CasterRenderers { get; }
 
@@ -168,8 +177,9 @@ namespace ShadowOnlyShader
         Matrix4x4 GetSliceViewMatrix(int sliceIndex);
 
         /// <summary>
-        /// CasterRoot配下の全Rendererを再収集する。
-        /// dirtyフラグが立っている場合のみ実行される。
+        /// EffectiveCasterRoot配下の全Rendererを再収集する。
+        /// dirtyフラグが立っているか、実効キャスタールートが前回の収集時から
+        /// 変わっている場合のみ実行される。
         /// </summary>
         void CollectRenderers();
 

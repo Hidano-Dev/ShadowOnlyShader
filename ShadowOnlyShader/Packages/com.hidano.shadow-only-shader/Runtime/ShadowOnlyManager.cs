@@ -24,6 +24,10 @@ namespace ShadowOnlyShader
 
         #region Serialized Fields
 
+        [Tooltip("全VirtualLight共通のキャスタールート。影を落とすオブジェクトの親を指定します。VirtualLight側でCaster Rootが個別指定されている光源はそちらが優先されます")]
+        [SerializeField]
+        private GameObject _defaultCasterRoot;
+
         [Tooltip("影のぼかし品質。Low は軽量だが粗く、High は滑らかだが処理負荷が高くなります")]
         [SerializeField]
         private BlurQuality _blurQuality = BlurQuality.Mid;
@@ -246,6 +250,13 @@ namespace ShadowOnlyShader
         #endregion
 
         #region IShadowOnlyManager - グローバルパラメータ
+
+        /// <inheritdoc />
+        public GameObject DefaultCasterRoot
+        {
+            get => _defaultCasterRoot;
+            set => _defaultCasterRoot = value;
+        }
 
         /// <inheritdoc />
         public BlurQuality BlurQuality

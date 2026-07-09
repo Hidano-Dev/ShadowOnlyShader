@@ -5,6 +5,17 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.8.0] - 2026-07-10
+
+### 変更
+
+- キャスタールートの指定を ShadowOnlyManager での一括指定に変更
+  - Manager に `Default Caster Root` を追加。未設定の VirtualLight はこの共通設定を影の投影元として使用する
+  - VirtualLight 側の `Caster Root` は個別上書き用に変更（設定した光源のみ、その配下が影の元になる）
+  - `IVirtualLight` に実効ルートを返す読み取り専用プロパティ `EffectiveCasterRoot` を追加、`IShadowOnlyManager` に `DefaultCasterRoot` を追加
+  - Manager 側の `Default Caster Root` を実行中に差し替えた場合も、次フレームの収集で自動的に反映される（VirtualLight 側への明示的な通知は不要）
+  - Inspector: VirtualLight の Caster Root が未設定のとき、実際に使用される Manager の Default Caster Root を情報表示。診断のキャスター未設定エラーは共通・個別の両方を案内するメッセージに変更
+
 ## [0.7.0] - 2026-07-10
 
 ### 追加

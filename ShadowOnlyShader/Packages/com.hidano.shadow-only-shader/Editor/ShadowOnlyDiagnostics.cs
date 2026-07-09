@@ -607,23 +607,27 @@ namespace ShadowOnlyShader.Editor
         private static void CollectLightIssues(VirtualLight vl, Plane[][] frustums, List<DiagnosticIssue> issues)
         {
             // --- キャスター設定 ---
-            if (vl.CasterRoot == null)
+            // 個別のCasterRootが未設定の場合はManagerのDefault Caster Rootにフォールバックする
+            var casterRoot = vl.EffectiveCasterRoot;
+            if (casterRoot == null)
             {
                 Add(issues, DiagnosticSeverity.Error,
-                    "Caster Rootが設定されていません。影を落とすオブジェクトの親を指定してください。");
+                    "キャスタールートが設定されていません。ShadowOnlyManagerの" +
+                    "Default Caster Rootに影を落とすオブジェクトの親を指定するか、" +
+                    "この光源のCaster Rootで個別に指定してください。");
             }
             else
             {
-                var renderers = vl.CasterRoot.GetComponentsInChildren<Renderer>(true);
+                var renderers = casterRoot.GetComponentsInChildren<Renderer>(true);
                 if (renderers.Length == 0)
                 {
                     Add(issues, DiagnosticSeverity.Error,
-                        $"Caster Root「{vl.CasterRoot.name}」の配下にRendererが1つもありません。" +
+                        $"キャスタールート「{casterRoot.name}」の配下にRendererが1つもありません。" +
                         "メッシュを持つオブジェクトを指定してください。");
                 }
                 else
                 {
-                    CheckCasterVisibilityAndFrustum(vl, renderers, frustums, issues);
+                    CheckCasterVisibilityAndFrustum(vl, casterRoot, renderers, frustums, issues);
                 }
             }
 
@@ -663,6 +667,7 @@ namespace ShadowOnlyShader.Editor
         /// </summary>
         private static void CheckCasterVisibilityAndFrustum(
             VirtualLight vl,
+            GameObject casterRoot,
             Renderer[] renderers,
             Plane[][] frustums,
             List<DiagnosticIssue> issues)
@@ -687,7 +692,7 @@ namespace ShadowOnlyShader.Editor
             if (visibleCount == 0)
             {
                 Add(issues, DiagnosticSeverity.Warning,
-                    $"Caster Root「{vl.CasterRoot.name}」配下のRendererが" +
+                    $"キャスタールート「{casterRoot.name}」配下のRendererが" +
                     "すべて非アクティブまたは無効です。影の元になるオブジェクトが1つも描画されません。");
                 return;
             }
@@ -815,17 +820,18 @@ namespace ShadowOnlyShader.Editor
             List<VirtualLight> activeLights,
             List<Plane[][]> lightFrustums)
         {
-            // 床がいずれかのCasterRoot配下に含まれる場合、床自身が影を落とし
+            // 床がいずれかの実効キャスタールート配下に含まれる場合、床自身が影を落とし
             // 全面が影になる・ちらつくなどの異常の原因になる
             foreach (var vl in activeLights)
             {
-                if (vl.CasterRoot != null && floor.transform.IsChildOf(vl.CasterRoot.transform))
+                var casterRoot = vl.EffectiveCasterRoot;
+                if (casterRoot != null && floor.transform.IsChildOf(casterRoot.transform))
                 {
                     Add(issues, DiagnosticSeverity.Warning,
                         $"床面「{floor.gameObject.name}」が仮想光源「{vl.gameObject.name}」の" +
-                        "Caster Root配下に含まれています。床自身が影を落とすため、" +
-                        "床全体が影になる・ちらつくなどの異常の原因になります。" +
-                        "Caster Rootから床を除外してください。");
+                        $"キャスタールート「{casterRoot.name}」配下に含まれています。" +
+                        "床自身が影を落とすため、床全体が影になる・ちらつくなどの異常の原因になります。" +
+                        "キャスタールートから床を除外してください。");
                     break;
                 }
             }

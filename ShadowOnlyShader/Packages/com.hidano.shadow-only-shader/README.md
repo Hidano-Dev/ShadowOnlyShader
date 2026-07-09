@@ -46,7 +46,9 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 
 ### 5. キャスターを設定する
 
-影を落としたいオブジェクト (キャラクターモデルなど) のルート GameObject を VirtualLight の **Caster Root** に指定します。その配下のすべての Renderer (MeshRenderer・SkinnedMeshRenderer) が影の投影元になります。
+影を落としたいオブジェクト (キャラクターモデルなど) のルート GameObject を Manager の **Default Caster Root** に指定します。その配下のすべての Renderer (MeshRenderer・SkinnedMeshRenderer) が、全仮想光源の影の投影元になります。
+
+特定の光源だけ別のオブジェクトの影を落としたい場合は、その VirtualLight の **Caster Root** に個別指定してください（未設定の光源は Manager の Default Caster Root を使用します）。
 
 ## 主なパラメータ
 
@@ -54,6 +56,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 
 | パラメータ | 説明 |
 |-----------|------|
+| Default Caster Root | 全光源共通の、影を落とすオブジェクトのルート |
 | Blur Quality | ぼかし品質 (Low / Mid / High) |
 | Blend Multiplier | 影の合成強度 |
 | Blur Resolution Scale | ブラー計算の解像度スケール (0.1〜1.0)。低い値ほど軽量だが影がぼやける |
@@ -77,7 +80,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 | Source Light | Unity Light との同期（Transform・投影パラメータ・影の濃さ・色収差フリンジ色を自動連動） |
 | Chromatic Aberration Color | 色収差の光源色（Source Light 未設定時のフォールバック） |
 | Texture Resolution | 深度テクスチャの解像度 (URP Default / 64〜8192) |
-| Caster Root | 影を落とすオブジェクトのルート |
+| Caster Root | この光源だけ影の元を変えたい場合の個別指定（未設定なら Manager の Default Caster Root を使用） |
 
 ## 特徴
 
@@ -101,7 +104,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 - `Blend Multiplier` が 0 で影が透明になっている
 - 共有深度テクスチャの解像度過大（GPU メモリ警告。設定の出どころと修正手順を表示）など
 
-VirtualLight 個別の問題（Caster Root 未設定・キャスターが投影範囲外・`Shadow Alpha` が 0 など）は、**各 VirtualLight の Inspector 上部** の「診断」セクションに表示されます。Manager 側には「どの光源に問題が何件あるか」の集約結果のみが表示されます。
+VirtualLight 個別の問題（キャスタールート未設定（共通・個別とも）・キャスターが投影範囲外・`Shadow Alpha` が 0 など）は、**各 VirtualLight の Inspector 上部** の「診断」セクションに表示されます。Manager 側には「どの光源に問題が何件あるか」の集約結果のみが表示されます。
 
 診断は自動で更新されますが、「再診断」ボタンで即時に再実行できます。
 
@@ -136,11 +139,16 @@ Package Manager の Samples タブから **Basic Setup** をインポートす�
 ```csharp
 var manager = GetComponent<ShadowOnlyManager>();
 
+// 全光源共通のキャスターを設定
+manager.DefaultCasterRoot = myCharacter;
+
 // 仮想光源を追加
 var light = manager.AddVirtualLight();
 light.ProjectionMode = ProjectionMode.Orthographic;
-light.CasterRoot = myCharacter;
 light.ShadowAlpha = 0.6f;
+
+// この光源だけ別のオブジェクトの影を落とす（個別上書き）
+// light.CasterRoot = otherObject;
 
 // 床面を追加
 manager.AddFloorRenderer(floorRenderer);

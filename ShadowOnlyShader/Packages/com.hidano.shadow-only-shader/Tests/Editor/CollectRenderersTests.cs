@@ -13,6 +13,7 @@ namespace ShadowOnlyShader.Tests.Editor
         private GameObject _virtualLightGO;
         private VirtualLight _virtualLight;
         private GameObject _casterRoot;
+        private GameObject _managerGO;
 
         [SetUp]
         public void SetUp()
@@ -29,6 +30,20 @@ namespace ShadowOnlyShader.Tests.Editor
                 Object.DestroyImmediate(_virtualLightGO);
             if (_casterRoot != null)
                 Object.DestroyImmediate(_casterRoot);
+            if (_managerGO != null)
+                Object.DestroyImmediate(_managerGO);
+        }
+
+        /// <summary>
+        /// VirtualLightをShadowOnlyManagerの子に配置した状態を作る。
+        /// Manager共通CasterRoot（DefaultCasterRoot）のフォールバック検証に使用する。
+        /// </summary>
+        private ShadowOnlyManager SetUpManagerAsParent()
+        {
+            _managerGO = new GameObject("TestManager");
+            var manager = _managerGO.AddComponent<ShadowOnlyManager>();
+            _virtualLightGO.transform.SetParent(_managerGO.transform);
+            return manager;
         }
 
         [Test]
@@ -187,6 +202,101 @@ namespace ShadowOnlyShader.Tests.Editor
             // Assert
             Assert.AreEqual(0, _virtualLight.CasterRenderers.Count,
                 "再収集時に前回のリストがクリアされるべき");
+        }
+
+        [Test]
+        public void CollectRenderers_個別未設定_Manager共通のDefaultCasterRootが使用される()
+        {
+            // Arrange: Manager側にのみキャスタールートを設定
+            var manager = SetUpManagerAsParent();
+            _casterRoot.AddComponent<MeshFilter>();
+            _casterRoot.AddComponent<MeshRenderer>();
+            manager.DefaultCasterRoot = _casterRoot;
+            _virtualLight.CasterRoot = null;
+
+            // Act
+            _virtualLight.CollectRenderers();
+
+            // Assert
+            Assert.AreEqual(_casterRoot, _virtualLight.EffectiveCasterRoot,
+                "個別未設定時はManagerのDefaultCasterRootが実効ルートになるべき");
+            Assert.AreEqual(1, _virtualLight.CasterRenderers.Count,
+                "ManagerのDefaultCasterRoot配下のRendererが収集されるべき");
+        }
+
+        [Test]
+        public void CollectRenderers_個別指定あり_Manager共通より優先される()
+        {
+            // Arrange: Manager共通とVirtualLight個別の両方を設定
+            var manager = SetUpManagerAsParent();
+            manager.DefaultCasterRoot = _casterRoot;
+
+            var overrideRoot = new GameObject("OverrideRoot");
+            overrideRoot.AddComponent<MeshFilter>();
+            overrideRoot.AddComponent<MeshRenderer>();
+            var overrideChild = new GameObject("OverrideChild");
+            overrideChild.transform.SetParent(overrideRoot.transform);
+            overrideChild.AddComponent<MeshFilter>();
+            overrideChild.AddComponent<MeshRenderer>();
+
+            _virtualLight.CasterRoot = overrideRoot;
+
+            // Act
+            _virtualLight.CollectRenderers();
+
+            // Assert
+            Assert.AreEqual(overrideRoot, _virtualLight.EffectiveCasterRoot,
+                "個別指定がある場合はそちらが実効ルートになるべき");
+            Assert.AreEqual(2, _virtualLight.CasterRenderers.Count,
+                "個別指定したルート配下のRendererが収集されるべき");
+
+            // Cleanup
+            Object.DestroyImmediate(overrideRoot);
+        }
+
+        [Test]
+        public void CollectRenderers_Manager共通のDefaultCasterRoot変更_再収集される()
+        {
+            // Arrange: 最初のDefaultCasterRootで収集
+            var manager = SetUpManagerAsParent();
+            _casterRoot.AddComponent<MeshFilter>();
+            _casterRoot.AddComponent<MeshRenderer>();
+            manager.DefaultCasterRoot = _casterRoot;
+            _virtualLight.CollectRenderers();
+            Assert.AreEqual(1, _virtualLight.CasterRenderers.Count);
+
+            // Act: Manager側のDefaultCasterRootを差し替えて再収集
+            //（VirtualLight側にdirty通知は入らないが、実効ルートの変化で検出される）
+            var newRoot = new GameObject("NewDefaultRoot");
+            var newChild1 = new GameObject("NewChild1");
+            newChild1.transform.SetParent(newRoot.transform);
+            newChild1.AddComponent<MeshFilter>();
+            newChild1.AddComponent<MeshRenderer>();
+            var newChild2 = new GameObject("NewChild2");
+            newChild2.transform.SetParent(newRoot.transform);
+            newChild2.AddComponent<MeshFilter>();
+            newChild2.AddComponent<MeshRenderer>();
+
+            manager.DefaultCasterRoot = newRoot;
+            _virtualLight.CollectRenderers();
+
+            // Assert
+            Assert.AreEqual(2, _virtualLight.CasterRenderers.Count,
+                "DefaultCasterRootの差し替えが自動検出され、新しいルートから再収集されるべき");
+
+            // Cleanup
+            Object.DestroyImmediate(newRoot);
+        }
+
+        [Test]
+        public void EffectiveCasterRoot_Managerなし個別未設定_nullを返す()
+        {
+            // Arrange
+            _virtualLight.CasterRoot = null;
+
+            // Act & Assert
+            Assert.IsNull(_virtualLight.EffectiveCasterRoot,
+                "Manager配下になく個別指定もない場合、実効ルートはnullであるべき");
         }
 
         [Test]

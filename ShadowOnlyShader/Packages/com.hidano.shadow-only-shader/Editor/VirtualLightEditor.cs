@@ -18,6 +18,7 @@ namespace ShadowOnlyShader.Editor
         /// <summary>診断の自動再実行間隔（秒）。Inspector再描画のたびに走らないよう間引く。</summary>
         private const double DiagnosticsIntervalSeconds = 2.0;
 
+        private SerializedProperty _casterRoot;
         private SerializedProperty _sourceLight;
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
@@ -97,6 +98,7 @@ namespace ShadowOnlyShader.Editor
 
         private void OnEnable()
         {
+            _casterRoot = serializedObject.FindProperty("_casterRoot");
             _sourceLight = serializedObject.FindProperty("_sourceLight");
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
             _projectionMode = serializedObject.FindProperty("_projectionMode");
@@ -205,6 +207,14 @@ namespace ShadowOnlyShader.Editor
                     {
                         EditorGUILayout.PropertyField(iterator);
                     }
+                    continue;
+                }
+
+                // CasterRootは上書き指定であることが分かるよう、未設定時にManagerの共通設定を表示する
+                if (iterator.propertyPath == "_casterRoot")
+                {
+                    EditorGUILayout.PropertyField(iterator);
+                    DrawCasterRootHint();
                     continue;
                 }
 
@@ -367,6 +377,30 @@ namespace ShadowOnlyShader.Editor
                 case DiagnosticSeverity.Error: return MessageType.Error;
                 case DiagnosticSeverity.Warning: return MessageType.Warning;
                 default: return MessageType.Info;
+            }
+        }
+
+        #endregion
+
+        #region Caster Root Hint
+
+        /// <summary>
+        /// CasterRoot未設定時に、実際に使用されるManagerのDefault Caster Rootを表示する。
+        /// どちらも未設定の場合のエラーは診断セクションが報告するため、ここでは扱わない。
+        /// </summary>
+        private void DrawCasterRootHint()
+        {
+            if (serializedObject.isEditingMultipleObjects) return;
+            if (_casterRoot.objectReferenceValue != null) return;
+
+            var light = (VirtualLight)target;
+            var manager = light.GetComponentInParent<ShadowOnlyManager>(true);
+            if (manager != null && manager.DefaultCasterRoot != null)
+            {
+                EditorGUILayout.HelpBox(
+                    $"未設定のため、ShadowOnlyManagerのDefault Caster Root" +
+                    $"「{manager.DefaultCasterRoot.name}」を使用します。",
+                    MessageType.Info);
             }
         }
 

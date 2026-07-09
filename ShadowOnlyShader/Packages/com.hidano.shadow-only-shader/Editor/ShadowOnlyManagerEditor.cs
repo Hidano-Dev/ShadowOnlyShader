@@ -14,6 +14,7 @@ namespace ShadowOnlyShader.Editor
         /// <summary>診断の自動再実行間隔（秒）。Inspector再描画のたびに走らないよう間引く。</summary>
         private const double DiagnosticsIntervalSeconds = 2.0;
 
+        private SerializedProperty _defaultCasterRoot;
         private SerializedProperty _blurQuality;
         private SerializedProperty _blendMultiplier;
         private SerializedProperty _blurResolutionScale;
@@ -28,6 +29,7 @@ namespace ShadowOnlyShader.Editor
 
         private void OnEnable()
         {
+            _defaultCasterRoot = serializedObject.FindProperty("_defaultCasterRoot");
             _blurQuality = serializedObject.FindProperty("_blurQuality");
             _blendMultiplier = serializedObject.FindProperty("_blendMultiplier");
             _blurResolutionScale = serializedObject.FindProperty("_blurResolutionScale");
@@ -112,6 +114,11 @@ namespace ShadowOnlyShader.Editor
             }
 
             EditorGUILayout.Space(8);
+
+            // キャスタールート（全光源共通のデフォルト）
+            EditorGUILayout.PropertyField(_defaultCasterRoot, new GUIContent("Default Caster Root",
+                "全VirtualLight共通のキャスタールート。影を落とすオブジェクトの親を指定します。" +
+                "VirtualLight側でCaster Rootが個別指定されている光源はそちらが優先されます。"));
 
             // 床面Renderer
             EditorGUILayout.PropertyField(_floorRenderers, new GUIContent("床面Renderer",
