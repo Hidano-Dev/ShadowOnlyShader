@@ -13,8 +13,12 @@ namespace ShadowOnlyShader
     /// </summary>
     public class ShadowOnlyManager : MonoBehaviour, IShadowOnlyManager
     {
-        /// <summary>仮想光源の最大数。</summary>
-        internal const int MaxVirtualLights = 8;
+        /// <summary>
+        /// 同時に描画できる仮想光源の最大数。
+        /// UnityのLight数制限とは無関係で、本パッケージのシェーダーuniform配列サイズに由来する。
+        /// 変更する場合はShadowOnlyFloorCommon.hlslのMAX_VIRTUAL_LIGHTSも同じ値にすること。
+        /// </summary>
+        internal const int MaxVirtualLights = 32;
 
         #region Serialized Fields
 
@@ -82,6 +86,17 @@ namespace ShadowOnlyShader
         /// 全VirtualLight共有の深度Texture2DArray。
         /// </summary>
         private RenderTexture _depthArrayTexture;
+
+        /// <summary>
+        /// 直近にEnsureDepthArrayTextureへ要求された解像度。
+        /// 作成失敗時に自動縮小された実解像度と区別し、毎フレームの再作成ループを防ぐ。
+        /// </summary>
+        private int _requestedResolution;
+
+        /// <summary>
+        /// 直近にEnsureDepthArrayTextureへ要求されたスライス数。
+        /// </summary>
+        private int _requestedSliceCount;
 
         /// <summary>
         /// 床面Material割り当てが必要かどうかのフラグ。
@@ -297,10 +312,11 @@ namespace ShadowOnlyShader
                 return;
             }
 
-            // 既存のTexture2DArrayが存在し、解像度・スライス数が一致する場合はそのまま
+            // 既存のTexture2DArrayが存在し、要求解像度・スライス数が前回と一致する場合はそのまま。
+            // 作成失敗時に解像度を自動縮小するため、実テクスチャの解像度ではなく要求値で比較する
             if (_depthArrayTexture != null
-                && _depthArrayTexture.width == resolution
-                && _depthArrayTexture.volumeDepth == sliceCount)
+                && _requestedResolution == resolution
+                && _requestedSliceCount == sliceCount)
             {
                 return;
             }
@@ -308,12 +324,51 @@ namespace ShadowOnlyShader
             // 古いTexture2DArrayを破棄
             ReleaseDepthArrayTexture();
 
-            // 新しいTexture2DArrayを作成（スライス数は実際のアクティブライト数）
-            _depthArrayTexture = new RenderTexture(resolution, resolution, 24, RenderTextureFormat.Depth);
-            _depthArrayTexture.dimension = TextureDimension.Tex2DArray;
-            _depthArrayTexture.volumeDepth = sliceCount;
-            _depthArrayTexture.hideFlags = HideFlags.DontSave;
-            _depthArrayTexture.Create();
+            _requestedResolution = resolution;
+            _requestedSliceCount = sliceCount;
+
+            // 新しいTexture2DArrayを作成（スライス数は実際のアクティブライト数）。
+            // 高解像度×多スライスの組み合わせはGPUメモリ確保に失敗することがあり、
+            // そのまま放置すると影が一切表示されなくなるため、
+            // 失敗時は解像度を半減しながらリトライして描画を継続する。
+            int actualResolution = resolution;
+            while (true)
+            {
+                var texture = new RenderTexture(actualResolution, actualResolution, 24, RenderTextureFormat.Depth);
+                texture.dimension = TextureDimension.Tex2DArray;
+                texture.volumeDepth = sliceCount;
+                texture.hideFlags = HideFlags.DontSave;
+
+                if (texture.Create())
+                {
+                    _depthArrayTexture = texture;
+                    break;
+                }
+
+                texture.Release();
+                DestroyImmediate(texture);
+
+                if (actualResolution <= 256)
+                {
+                    Debug.LogError(
+                        "[ShadowOnlyShader] 深度Texture2DArrayを作成できませんでした" +
+                        $"（要求解像度 {resolution}、スライス数 {sliceCount}）。影は描画されません。",
+                        this);
+                    return;
+                }
+
+                actualResolution /= 2;
+            }
+
+            if (actualResolution != resolution)
+            {
+                Debug.LogWarning(
+                    "[ShadowOnlyShader] 深度Texture2DArrayの作成に失敗したため、解像度を " +
+                    $"{resolution} から {actualResolution} に自動縮小しました（スライス数 {sliceCount}）。" +
+                    "VirtualLightのTexture Resolution、またはURP AssetのMain Light Shadow Resolutionを" +
+                    "見直してください。",
+                    this);
+            }
         }
 
         /// <summary>

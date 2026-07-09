@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -5,6 +6,7 @@ namespace ShadowOnlyShader.Editor
 {
     /// <summary>
     /// VirtualLightのカスタムInspector。
+    /// Inspector上部にこの光源の個別診断（CasterRoot・投影範囲・ShadowAlpha等）を表示する。
     /// SourceLight設定時に同期対象フィールドを非表示にし、ChromaticAberrationColorも非表示にする。
     /// TextureResolutionを2のべき乗ドロップダウン（URP Default付き）で表示する。
     /// オプション項目はフォールドアウトで畳んで表示する。
@@ -13,6 +15,9 @@ namespace ShadowOnlyShader.Editor
     [CanEditMultipleObjects]
     public class VirtualLightEditor : UnityEditor.Editor
     {
+        /// <summary>診断の自動再実行間隔（秒）。Inspector再描画のたびに走らないよう間引く。</summary>
+        private const double DiagnosticsIntervalSeconds = 2.0;
+
         private SerializedProperty _sourceLight;
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
@@ -44,6 +49,11 @@ namespace ShadowOnlyShader.Editor
         private bool _depthBiasFoldout;
         private bool _blurFoldout;
         private bool _effectsFoldout;
+
+        // 診断表示の状態
+        private bool _showDiagnostics = true;
+        private List<DiagnosticIssue> _diagnostics;
+        private double _lastDiagnosticsTime;
 
         // 解像度ドロップダウンの選択肢（0 = URP Default）
         private static readonly int[] ResolutionValues = { 0, 64, 128, 256, 512, 1024, 2048, 4096, 8192 };
@@ -107,12 +117,22 @@ namespace ShadowOnlyShader.Editor
             _chromaticAberration = serializedObject.FindProperty("_chromaticAberration");
             _contactHardeningStrength = serializedObject.FindProperty("_contactHardeningStrength");
 
+            // Inspector表示時に診断を即実行する
+            _diagnostics = null;
+
             EnsureHueSpectrumTexture();
         }
 
         public override void OnInspectorGUI()
         {
             serializedObject.Update();
+
+            // 診断セクション（この光源が影を表示できない原因の検出）
+            // マルチ選択時は対象が曖昧になるため表示しない
+            if (!serializedObject.isEditingMultipleObjects)
+            {
+                DrawDiagnostics((VirtualLight)target);
+            }
 
             // マルチオブジェクト対応: いずれかがSourceLightを持つか、値が混在しているかを判定
             bool hasSourceLight = _sourceLight.objectReferenceValue != null;
@@ -280,6 +300,71 @@ namespace ShadowOnlyShader.Editor
 
             serializedObject.ApplyModifiedProperties();
         }
+
+        #region Diagnostics
+
+        /// <summary>
+        /// この光源の個別診断セクションを描画する。
+        /// ShadowOnlyManagerEditorの診断と同じスタイルで、一定間隔の自動再実行と
+        /// 「再診断」ボタンによる即時更新に対応する。
+        /// </summary>
+        private void DrawDiagnostics(VirtualLight light)
+        {
+            double now = EditorApplication.timeSinceStartup;
+            if (_diagnostics == null || now - _lastDiagnosticsTime > DiagnosticsIntervalSeconds)
+            {
+                _diagnostics = ShadowOnlyDiagnostics.RunForLight(light);
+                _lastDiagnosticsTime = now;
+            }
+
+            int errorCount = 0;
+            int warningCount = 0;
+            foreach (var issue in _diagnostics)
+            {
+                if (issue.Severity == DiagnosticSeverity.Error) errorCount++;
+                else if (issue.Severity == DiagnosticSeverity.Warning) warningCount++;
+            }
+
+            string label = (errorCount == 0 && warningCount == 0)
+                ? "診断: 問題なし"
+                : $"診断: エラー {errorCount}件 / 警告 {warningCount}件";
+
+            _showDiagnostics = EditorGUILayout.Foldout(_showDiagnostics, label, true, EditorStyles.foldoutHeader);
+            if (_showDiagnostics)
+            {
+                if (_diagnostics.Count == 0)
+                {
+                    EditorGUILayout.HelpBox("問題は検出されませんでした。", MessageType.Info);
+                }
+                else
+                {
+                    foreach (var issue in _diagnostics)
+                    {
+                        EditorGUILayout.HelpBox(issue.Message, ToMessageType(issue.Severity));
+                    }
+                }
+
+                if (GUILayout.Button("再診断"))
+                {
+                    _diagnostics = ShadowOnlyDiagnostics.RunForLight(light);
+                    _lastDiagnosticsTime = now;
+                }
+            }
+
+            EditorGUILayout.Space(8);
+        }
+
+        private static MessageType ToMessageType(DiagnosticSeverity severity)
+        {
+            switch (severity)
+            {
+                case DiagnosticSeverity.Error: return MessageType.Error;
+                case DiagnosticSeverity.Warning: return MessageType.Warning;
+                default: return MessageType.Info;
+            }
+        }
+
+        #endregion
 
         #region Foldout Sections
 

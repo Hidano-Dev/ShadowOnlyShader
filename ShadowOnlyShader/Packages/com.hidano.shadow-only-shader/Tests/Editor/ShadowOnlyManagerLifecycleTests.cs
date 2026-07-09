@@ -111,12 +111,39 @@ namespace ShadowOnlyShader.Tests.Editor
 
         #region 深度Texture2DArray ライフサイクル
 
+        /// <summary>
+        /// 子VirtualLight付きのManagerを生成するヘルパー。
+        /// 深度Texture2DArrayはアクティブなVirtualLightが1つ以上ないと作成されない。
+        /// </summary>
+        private static ShadowOnlyManager CreateManagerWithVirtualLight(out GameObject managerGO)
+        {
+            managerGO = new GameObject("TestManager");
+            var vlGO = new GameObject("VL");
+            vlGO.transform.SetParent(managerGO.transform);
+            vlGO.AddComponent<VirtualLight>();
+            return managerGO.AddComponent<ShadowOnlyManager>();
+        }
+
         [Test]
-        public void Manager_OnEnable_DepthArrayTextureが作成される()
+        public void Manager_OnEnable_VirtualLightなし_DepthArrayTextureは作成されない()
         {
             // Arrange & Act
             var go = new GameObject("TestManager");
             var manager = go.AddComponent<ShadowOnlyManager>();
+
+            // Assert: アクティブなVirtualLightがなければテクスチャ不要
+            Assert.IsNull(manager.DepthArrayTexture,
+                "VirtualLightがない場合、DepthArrayTextureは作成されないべき");
+
+            // Cleanup
+            Object.DestroyImmediate(go);
+        }
+
+        [Test]
+        public void Manager_OnEnable_DepthArrayTextureが作成される()
+        {
+            // Arrange & Act
+            var manager = CreateManagerWithVirtualLight(out var go);
 
             // Assert: OnEnableで深度Texture2DArrayが作成される
             Assert.IsNotNull(manager.DepthArrayTexture,
@@ -124,9 +151,9 @@ namespace ShadowOnlyShader.Tests.Editor
             Assert.AreEqual(UnityEngine.Rendering.TextureDimension.Tex2DArray,
                 manager.DepthArrayTexture.dimension,
                 "DepthArrayTextureはTexture2DArrayであるべき");
-            Assert.AreEqual(8,
+            Assert.AreEqual(1,
                 manager.DepthArrayTexture.volumeDepth,
-                "DepthArrayTextureのスライス数は8であるべき");
+                "DepthArrayTextureのスライス数はアクティブVirtualLight数と一致するべき");
 
             // Cleanup
             Object.DestroyImmediate(go);
@@ -136,8 +163,7 @@ namespace ShadowOnlyShader.Tests.Editor
         public void Manager_DepthArrayTexture_HideFlagsDontSaveが設定される()
         {
             // Arrange & Act
-            var go = new GameObject("TestManager");
-            var manager = go.AddComponent<ShadowOnlyManager>();
+            var manager = CreateManagerWithVirtualLight(out var go);
 
             // Assert
             Assert.IsNotNull(manager.DepthArrayTexture);
@@ -153,8 +179,7 @@ namespace ShadowOnlyShader.Tests.Editor
         public void Manager_OnDisable_DepthArrayTextureが破棄される()
         {
             // Arrange
-            var go = new GameObject("TestManager");
-            var manager = go.AddComponent<ShadowOnlyManager>();
+            var manager = CreateManagerWithVirtualLight(out var go);
             var rtRef = manager.DepthArrayTexture;
             Assert.IsNotNull(rtRef);
 

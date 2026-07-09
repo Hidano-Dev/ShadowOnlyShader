@@ -146,7 +146,7 @@ namespace ShadowOnlyShader
             var virtualLights = _manager.VirtualLights;
             int validCount = 0;
 
-            for (int i = 0; i < virtualLights.Count && validCount < 8; i++)
+            for (int i = 0; i < virtualLights.Count && validCount < ShadowOnlyManager.MaxVirtualLights; i++)
             {
                 var vl = virtualLights[i] as VirtualLight;
                 if (vl == null || !vl.isActiveAndEnabled)

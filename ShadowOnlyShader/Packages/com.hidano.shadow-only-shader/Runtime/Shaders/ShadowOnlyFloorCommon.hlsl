@@ -3,8 +3,8 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-// 仮想光源の最大数
-#define MAX_VIRTUAL_LIGHTS 8
+// 仮想光源の最大数（ShadowOnlyManager.MaxVirtualLights と一致させること）
+#define MAX_VIRTUAL_LIGHTS 32
 
 // ブラー品質プリセットのサンプル半径（カーネル半径）
 #if defined(_BLUR_HIGH)

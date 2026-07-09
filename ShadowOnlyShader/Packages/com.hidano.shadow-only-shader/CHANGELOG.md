@@ -5,6 +5,24 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.6.0] - 2026-07-09
+
+### 変更
+
+- 仮想光源の同時描画上限を 8 個から 32 個に拡大
+  - 上限は Unity の Light 数制限とは無関係で、本パッケージのシェーダー uniform 配列サイズに由来する（`ShadowOnlyManager.MaxVirtualLights` と `ShadowOnlyFloorCommon.hlsl` の `MAX_VIRTUAL_LIGHTS` を連動して変更可能）
+  - 上限を超えた場合は先頭の 32 個のみが描画される（従来どおり超過分は無視、他の光源の描画には影響しない）
+- 診断表示の分離
+  - VirtualLight 個別の診断（CasterRoot 未設定 / 投影範囲外 / ShadowAlpha=0 / DepthBias 過大 / Texture Resolution 過大 / Manager 配下にない）を各 VirtualLight の Inspector 上部に表示するよう変更
+  - ShadowOnlyManager 側には「どの光源にエラー・警告が何件あるか」の集約 1 件のみを表示（灯体数が多い場合の診断リスト肥大を解消）
+- 深度テクスチャ解像度の診断を Manager 側に集約し、設定の出どころを明示
+  - 実際に使われる解像度は「最初のアクティブな VirtualLight」の設定で決まるため、光源ごとの警告をやめ、由来（VirtualLight の Texture Resolution 明示指定か、URP アセットの Main Light Shadow Resolution か）と修正手順、全スライス合計の GPU メモリ量を 1 件で報告
+
+### 修正
+
+- 深度 Texture2DArray の作成失敗（高解像度 × 多スライスによる GPU メモリ不足等）時に影が一切表示されなくなる問題を修正
+  - 作成に失敗した場合は解像度を半減しながらリトライし、警告ログを出して描画を継続する（下限 256）
+
 ## [0.5.1] - 2026-07-09
 
 ### 追加

@@ -38,21 +38,30 @@ namespace ShadowOnlyShader.Editor
 
     /// <summary>
     /// 「影が表示されない」原因になり得る設定・状態を検出する診断機能。
-    /// ShadowOnlyManagerEditorのInspectorから呼び出され、結果がHelpBoxで表示される。
     ///
-    /// 検出対象:
+    /// 表示先は2箇所に分かれる:
+    /// - Run(manager): ShadowOnlyManagerEditorのInspectorに表示。
+    ///   パイプライン系・環境系・Manager系・床面系の診断に加え、
+    ///   各VirtualLightの個別問題は「どの光源に何件あるか」の集約1件のみを出す。
+    /// - RunForLight(light): VirtualLightEditorのInspectorに表示。
+    ///   その光源自身の個別診断（CasterRoot / 投影範囲 / ShadowAlpha /
+    ///   DepthBias / Texture Resolution / Manager配下チェック）を出す。
+    ///
+    /// Manager側の検出対象:
     /// - パイプライン系: URP未使用 / Renderer FeatureがRendererに未登録・無効 /
     ///   Quality設定側URPアセットの差し替え漏れ（Graphics設定のみ変更の落とし穴）
     /// - 環境系: 必須シェーダーの欠落・非サポート / Texture2DArray・深度フォーマット非対応
     /// - Manager系: 非Playモード / Manager無効 / 複数Manager / BlendMultiplier=0
     /// - VirtualLight系: 光源なし / 全て非アクティブ / 上限超過 / Manager配下にない光源 /
-    ///   CasterRoot未設定・Rendererなし・全て非表示 / キャスターが投影範囲外 /
-    ///   ShadowAlpha=0 / DepthBias過大 / 深度テクスチャ解像度過大
+    ///   個別問題の集約 / 共有深度テクスチャの解像度過大（設定の出どころを明示）
     /// - 床面系: 未登録 / null要素 / 全て非表示 / 床がキャスターに含まれる（自己投影） /
     ///   床がどの光源の投影範囲にも入っていない / Play中のマテリアル上書き
     /// </summary>
     internal static class ShadowOnlyDiagnostics
     {
+        /// <summary>Manager側の集約メッセージに列挙する光源名の最大数。</summary>
+        private const int MaxAggregatedLightNames = 5;
+
         /// <summary>深度テクスチャ解像度の警告閾値。これ以上でメモリ・負荷警告を出す。</summary>
         private const int ResolutionWarningThreshold = 4096;
 
@@ -94,7 +103,56 @@ namespace ShadowOnlyShader.Editor
             CheckFloorRenderers(manager, issues, activeLights, lightFrustums);
             CheckOrphanVirtualLights(manager, issues);
 
-            // Error → Warning → Info の順に並べる（同一深刻度内は検出順を維持）
+            return SortBySeverity(issues);
+        }
+
+        /// <summary>
+        /// 指定したVirtualLight単体の診断を実行し、検出された問題を深刻度順で返す。
+        /// VirtualLightEditorのInspectorから呼び出される。
+        /// メッセージは対象光源自身のInspectorに表示される前提で、光源名のプレフィックスは付けない。
+        /// </summary>
+        public static List<DiagnosticIssue> RunForLight(VirtualLight light)
+        {
+            var issues = new List<DiagnosticIssue>();
+            if (light == null)
+            {
+                return issues;
+            }
+
+            // プレハブアセット上ではシーン依存の診断ができない
+            if (!light.gameObject.scene.IsValid())
+            {
+                Add(issues, DiagnosticSeverity.Info,
+                    "プレハブアセットのため診断は実行されません。シーンに配置した状態で確認してください。");
+                return issues;
+            }
+
+            if (light.GetComponentInParent<ShadowOnlyManager>(true) == null)
+            {
+                Add(issues, DiagnosticSeverity.Error,
+                    "ShadowOnlyManagerの子階層に配置されていないため、この光源は認識されません。" +
+                    "ManagerのGameObjectの子に移動してください。");
+            }
+
+            if (!light.isActiveAndEnabled)
+            {
+                Add(issues, DiagnosticSeverity.Info,
+                    "この仮想光源は非アクティブのため描画されません。");
+            }
+
+            // Editモードでは行列がLateUpdateで更新されないため、ここで明示的に計算する
+            light.UpdateMatrices();
+            var frustum = GeometryUtility.CalculateFrustumPlanes(light.ProjectionMatrix * light.ViewMatrix);
+            CollectLightIssues(light, frustum, issues);
+
+            return SortBySeverity(issues);
+        }
+
+        /// <summary>
+        /// Error → Warning → Info の順に並べ替える（同一深刻度内は検出順を維持）。
+        /// </summary>
+        private static List<DiagnosticIssue> SortBySeverity(List<DiagnosticIssue> issues)
+        {
             var sorted = new List<DiagnosticIssue>(issues.Count);
             for (var severity = DiagnosticSeverity.Error; severity >= DiagnosticSeverity.Info; severity--)
             {
@@ -330,7 +388,8 @@ namespace ShadowOnlyShader.Editor
         #region VirtualLightチェック
 
         /// <summary>
-        /// VirtualLightの構成（存在・アクティブ状態・キャスター設定・投影範囲・各パラメータ）を確認する。
+        /// VirtualLightの構成（存在・アクティブ状態・上限超過）を確認し、
+        /// 各光源の個別問題は件数を集約して1件のIssueとして報告する。
         /// アクティブな光源と投影フラスタムを収集し、床面チェックでも再利用する。
         /// </summary>
         private static void CheckVirtualLights(
@@ -369,9 +428,18 @@ namespace ShadowOnlyShader.Editor
             {
                 Add(issues, DiagnosticSeverity.Warning,
                     $"アクティブな仮想光源が{activeLights.Count}個あります。" +
-                    $"上限は{ShadowOnlyManager.MaxVirtualLights}個のため、" +
-                    $"{ShadowOnlyManager.MaxVirtualLights + 1}個目以降は無視されます。");
+                    $"同時に描画できるのは{ShadowOnlyManager.MaxVirtualLights}個までのため、" +
+                    $"先頭の{ShadowOnlyManager.MaxVirtualLights}個のみが描画されます。");
             }
+
+            // 各光源の個別診断はVirtualLight側のInspectorに表示するため、
+            // ここではError/Warningを持つ光源の集約結果のみを1件で出す
+            int problemLightCount = 0;
+            int totalErrors = 0;
+            int totalWarnings = 0;
+            var problemNames = new List<string>();
+            var maxSeverity = DiagnosticSeverity.Info;
+            var lightIssues = new List<DiagnosticIssue>();
 
             foreach (var vl in activeLights)
             {
@@ -380,23 +448,116 @@ namespace ShadowOnlyShader.Editor
                 var frustum = GeometryUtility.CalculateFrustumPlanes(vl.ProjectionMatrix * vl.ViewMatrix);
                 lightFrustums.Add(frustum);
 
-                CheckSingleLight(vl, frustum, issues);
+                lightIssues.Clear();
+                CollectLightIssues(vl, frustum, lightIssues);
+
+                bool hasProblem = false;
+                foreach (var issue in lightIssues)
+                {
+                    if (issue.Severity == DiagnosticSeverity.Error)
+                    {
+                        totalErrors++;
+                        hasProblem = true;
+                        maxSeverity = DiagnosticSeverity.Error;
+                    }
+                    else if (issue.Severity == DiagnosticSeverity.Warning)
+                    {
+                        totalWarnings++;
+                        hasProblem = true;
+                        if (maxSeverity < DiagnosticSeverity.Warning)
+                        {
+                            maxSeverity = DiagnosticSeverity.Warning;
+                        }
+                    }
+                }
+
+                if (hasProblem)
+                {
+                    problemLightCount++;
+                    if (problemNames.Count < MaxAggregatedLightNames)
+                    {
+                        problemNames.Add(vl.gameObject.name);
+                    }
+                }
             }
+
+            if (problemLightCount > 0)
+            {
+                string names = string.Join("、", problemNames);
+                if (problemLightCount > problemNames.Count)
+                {
+                    names += $" ほか{problemLightCount - problemNames.Count}個";
+                }
+                Add(issues, maxSeverity,
+                    $"{problemLightCount}個の仮想光源に問題があります" +
+                    $"（エラー{totalErrors}件 / 警告{totalWarnings}件: {names}）。" +
+                    "詳細は各VirtualLightのInspectorの「診断」セクションを確認してください。");
+            }
+
+            CheckDepthTextureResolution(issues, activeLights);
         }
 
         /// <summary>
-        /// 1つの仮想光源に対する診断を実行する。
+        /// 全光源共有の深度Texture2DArrayの解像度が過大でないかを確認する。
+        /// 実際に使われる解像度は「最初のアクティブなVirtualLight」の設定
+        /// （URP Default時はURP AssetのMain Light Shadow Resolution）で決まるため、
+        /// Manager側の診断として設定の出どころとともに1件で報告する。
         /// </summary>
-        private static void CheckSingleLight(VirtualLight vl, Plane[] frustum, List<DiagnosticIssue> issues)
+        private static void CheckDepthTextureResolution(
+            List<DiagnosticIssue> issues, List<VirtualLight> activeLights)
         {
-            string lightName = vl.gameObject.name;
+            if (activeLights.Count == 0)
+            {
+                return;
+            }
 
+            var first = activeLights[0];
+            int resolution = first.ResolveTextureResolution();
+            if (resolution < ResolutionWarningThreshold)
+            {
+                return;
+            }
+
+            int sliceCount = Mathf.Min(activeLights.Count, ShadowOnlyManager.MaxVirtualLights);
+            long totalBytes = (long)resolution * resolution * 4 * sliceCount;
+
+            string source;
+            string fixHint;
+            if (first.TextureResolution != VirtualLight.UseURPResolution)
+            {
+                source = $"最初のアクティブな仮想光源「{first.gameObject.name}」のTexture Resolution設定";
+                fixHint = $"VirtualLight「{first.gameObject.name}」のTexture Resolutionを下げてください。";
+            }
+            else
+            {
+                var urpAsset = GraphicsSettings.currentRenderPipeline as UniversalRenderPipelineAsset;
+                string assetName = urpAsset != null ? $"「{urpAsset.name}」" : "";
+                source = $"URPアセット{assetName}のMain Light Shadow Resolution" +
+                    "（VirtualLightのTexture ResolutionがURP Defaultのため）";
+                fixHint = "Project Settings > Quality で使用中のURPアセットの" +
+                    "Main Light Shadow Resolutionを下げるか、" +
+                    "VirtualLightのTexture Resolutionに明示的な解像度を指定してください。";
+            }
+
+            Add(issues, DiagnosticSeverity.Warning,
+                $"深度テクスチャ解像度が{resolution}×{resolution}と非常に大きく、" +
+                $"{sliceCount}ライト分で約{totalBytes / (1024 * 1024)}MBのGPUメモリを消費します" +
+                "（メモリ確保に失敗すると影が表示されなくなります）。" +
+                $"この値は{source}に由来します。{fixHint}");
+        }
+
+        /// <summary>
+        /// 1つの仮想光源に対する個別診断を実行する。
+        /// 結果はVirtualLightEditorのInspectorに表示されるほか、
+        /// Manager側では件数の集約に使用される。
+        /// </summary>
+        private static void CollectLightIssues(VirtualLight vl, Plane[] frustum, List<DiagnosticIssue> issues)
+        {
             // --- キャスター設定 ---
             if (vl.CasterRoot == null)
             {
                 Add(issues, DiagnosticSeverity.Error,
-                    $"仮想光源「{lightName}」: Caster Rootが設定されていません。" +
-                    "影を落とすオブジェクトの親を指定してください。");
+                    "Caster Rootが設定されていません。影を落とすオブジェクトの親を指定してください。");
             }
             else
             {
@@ -404,12 +565,12 @@ namespace ShadowOnlyShader.Editor
                 if (renderers.Length == 0)
                 {
                     Add(issues, DiagnosticSeverity.Error,
-                        $"仮想光源「{lightName}」: Caster Root「{vl.CasterRoot.name}」の配下に" +
-                        "Rendererが1つもありません。メッシュを持つオブジェクトを指定してください。");
+                        $"Caster Root「{vl.CasterRoot.name}」の配下にRendererが1つもありません。" +
+                        "メッシュを持つオブジェクトを指定してください。");
                 }
                 else
                 {
-                    CheckCasterVisibilityAndFrustum(vl, lightName, renderers, frustum, issues);
+                    CheckCasterVisibilityAndFrustum(vl, renderers, frustum, issues);
                 }
             }
 
@@ -420,26 +581,27 @@ namespace ShadowOnlyShader.Editor
                     ? $"Source Light「{vl.SourceLight.name}」のShadow Strengthが0のため、同期されたShadow Alphaが0になっています。"
                     : "Shadow Alphaが0のため、";
                 Add(issues, DiagnosticSeverity.Warning,
-                    $"仮想光源「{lightName}」: {reason}この光源の影は完全に透明です。");
+                    $"{reason}この光源の影は完全に透明です。");
             }
 
             // --- 深度バイアス ---
             if (vl.DepthBias >= DepthBiasWarningThreshold)
             {
                 Add(issues, DiagnosticSeverity.Warning,
-                    $"仮想光源「{lightName}」: Depth Biasが大きすぎる可能性があります" +
+                    "Depth Biasが大きすぎる可能性があります" +
                     $"（現在値 {vl.DepthBias:F3}）。影が消える・欠ける場合は値を小さくしてください。");
             }
 
-            // --- 深度テクスチャ解像度 ---
-            int resolution = vl.ResolveTextureResolution();
-            if (resolution >= ResolutionWarningThreshold)
+            // --- 深度テクスチャ解像度（明示指定時のみ。URP Default由来はManager側で診断する） ---
+            if (vl.TextureResolution != VirtualLight.UseURPResolution
+                && vl.TextureResolution >= ResolutionWarningThreshold)
             {
-                long bytesPerSlice = (long)resolution * resolution * 4;
+                long bytesPerSlice = (long)vl.TextureResolution * vl.TextureResolution * 4;
                 Add(issues, DiagnosticSeverity.Warning,
-                    $"仮想光源「{lightName}」: 深度テクスチャ解像度が{resolution}×{resolution}と非常に大きく、" +
+                    $"Texture Resolutionが{vl.TextureResolution}×{vl.TextureResolution}と非常に大きく、" +
                     $"1スライスあたり約{bytesPerSlice / (1024 * 1024)}MBのGPUメモリを消費します。" +
-                    "VirtualLightのTexture Resolution、またはURP AssetのMain Light Shadow Resolutionを確認してください。");
+                    "深度テクスチャは全光源共有のため、この光源が最初のアクティブ光源の場合は" +
+                    "全スライスがこの解像度になります。");
             }
         }
 
@@ -448,7 +610,6 @@ namespace ShadowOnlyShader.Editor
         /// </summary>
         private static void CheckCasterVisibilityAndFrustum(
             VirtualLight vl,
-            string lightName,
             Renderer[] renderers,
             Plane[] frustum,
             List<DiagnosticIssue> issues)
@@ -473,7 +634,7 @@ namespace ShadowOnlyShader.Editor
             if (visibleCount == 0)
             {
                 Add(issues, DiagnosticSeverity.Warning,
-                    $"仮想光源「{lightName}」: Caster Root「{vl.CasterRoot.name}」配下のRendererが" +
+                    $"Caster Root「{vl.CasterRoot.name}」配下のRendererが" +
                     "すべて非アクティブまたは無効です。影の元になるオブジェクトが1つも描画されません。");
                 return;
             }
@@ -484,13 +645,13 @@ namespace ShadowOnlyShader.Editor
                     ? "Orthographic Size"
                     : "Field Of View";
                 Add(issues, DiagnosticSeverity.Warning,
-                    $"仮想光源「{lightName}」: すべてのキャスターが投影範囲（フラスタム）の外にあります。" +
+                    "すべてのキャスターが投影範囲（フラスタム）の外にあります。" +
                     $"光源の位置・向き、{rangeHint}、Near/Far Clip Planeを確認してください。");
             }
             else if (insideCount < visibleCount)
             {
                 Add(issues, DiagnosticSeverity.Info,
-                    $"仮想光源「{lightName}」: 一部のキャスター（{visibleCount - insideCount}/{visibleCount}個）が" +
+                    $"一部のキャスター（{visibleCount - insideCount}/{visibleCount}個）が" +
                     "投影範囲の外にあります。該当オブジェクトの影は欠けるか表示されません。");
             }
         }
