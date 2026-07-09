@@ -19,6 +19,32 @@ namespace ShadowOnlyShader
         /// </summary>
         internal const int UseURPResolution = 0;
 
+        /// <summary>
+        /// Pointモードで使用するキューブ面数（±X/±Y/±Z）。
+        /// </summary>
+        public const int PointFaceCount = 6;
+
+        /// <summary>
+        /// Pointモードの各面の視野角（度）。
+        /// 90°×6面で全方向を隙間・重なりなくカバーする。
+        /// </summary>
+        internal const float PointFaceFieldOfView = 90f;
+
+        /// <summary>
+        /// Pointモードの6面の視線方向（ワールド軸基準）。
+        /// ポイントライトは全方向に均等なため、Transformの回転には追従させず
+        /// ワールド軸固定にする（回転しても影が変化しない物理的に正しい挙動）。
+        /// </summary>
+        private static readonly Quaternion[] PointFaceRotations =
+        {
+            Quaternion.LookRotation(Vector3.right, Vector3.up),
+            Quaternion.LookRotation(Vector3.left, Vector3.up),
+            Quaternion.LookRotation(Vector3.up, Vector3.back),
+            Quaternion.LookRotation(Vector3.down, Vector3.forward),
+            Quaternion.LookRotation(Vector3.forward, Vector3.up),
+            Quaternion.LookRotation(Vector3.back, Vector3.up),
+        };
+
         #region Serialized Fields - Caster
 
         [Header("Caster")]
@@ -44,7 +70,7 @@ namespace ShadowOnlyShader
         #region Serialized Fields - Projection Parameters
 
         [Header("Projection")]
-        [Tooltip("影の投影方式。Orthographic は平行光（太陽光のような均一な影）、Perspective は点光源（近くが大きく遠くが小さい影）になります")]
+        [Tooltip("影の投影方式。Orthographic は平行光（太陽光のような均一な影）、Perspective はスポットライト（1方向の円錐範囲）、Point はポイントライト（全方向、深度テクスチャを6スライス使用）になります")]
         [SerializeField]
         private ProjectionMode _projectionMode = ProjectionMode.Orthographic;
 
@@ -155,6 +181,11 @@ namespace ShadowOnlyShader
         private Matrix4x4 _viewMatrix = Matrix4x4.identity;
         private Matrix4x4 _projectionMatrix = Matrix4x4.identity;
         private Matrix4x4 _viewProjectionMatrix = Matrix4x4.identity;
+
+        /// <summary>
+        /// Pointモード時の各面のView行列（UpdateMatricesで更新される）。
+        /// </summary>
+        private readonly Matrix4x4[] _pointFaceViewMatrices = new Matrix4x4[PointFaceCount];
         private readonly List<Renderer> _casterRenderers = new List<Renderer>();
 
         /// <summary>
@@ -355,6 +386,20 @@ namespace ShadowOnlyShader
         /// <inheritdoc />
         public Matrix4x4 ViewProjectionMatrix => _viewProjectionMatrix;
 
+        /// <inheritdoc />
+        public int SliceCount => _projectionMode == ProjectionMode.Point ? PointFaceCount : 1;
+
+        /// <inheritdoc />
+        public Matrix4x4 GetSliceViewMatrix(int sliceIndex)
+        {
+            if (_projectionMode == ProjectionMode.Point)
+            {
+                sliceIndex = Mathf.Clamp(sliceIndex, 0, PointFaceCount - 1);
+                return _pointFaceViewMatrices[sliceIndex];
+            }
+            return _viewMatrix;
+        }
+
         #endregion
 
         #region IVirtualLight - Methods
@@ -378,6 +423,15 @@ namespace ShadowOnlyShader
             _viewMatrix = CalculateViewMatrix();
             _projectionMatrix = CalculateProjectionMatrix();
             _viewProjectionMatrix = _projectionMatrix * _viewMatrix;
+
+            if (_projectionMode == ProjectionMode.Point)
+            {
+                Vector3 position = transform.position;
+                for (int face = 0; face < PointFaceCount; face++)
+                {
+                    _pointFaceViewMatrices[face] = CalculateViewMatrix(position, PointFaceRotations[face]);
+                }
+            }
         }
 
         #endregion
@@ -415,12 +469,21 @@ namespace ShadowOnlyShader
         /// </summary>
         private Matrix4x4 CalculateViewMatrix()
         {
+            Transform t = transform;
+            return CalculateViewMatrix(t.position, t.rotation);
+        }
+
+        /// <summary>
+        /// 指定した位置・回転からView行列を算出する。
+        /// Pointモードの各面View行列の計算にも使用される。
+        /// </summary>
+        private static Matrix4x4 CalculateViewMatrix(Vector3 position, Quaternion rotation)
+        {
             // Unity's camera convention: camera looks down -Z in local space
             // Matrix4x4.TRS gives us the local-to-world transform.
             // View matrix is the inverse of the camera's world transform,
             // with Z axis flipped (right-hand to left-hand conversion for rendering).
-            Transform t = transform;
-            Matrix4x4 worldToLocal = Matrix4x4.TRS(t.position, t.rotation, Vector3.one).inverse;
+            Matrix4x4 worldToLocal = Matrix4x4.TRS(position, rotation, Vector3.one).inverse;
 
             // Flip Z axis for Unity's rendering convention (camera looks down +Z in view space becomes -Z)
             Matrix4x4 zFlip = Matrix4x4.Scale(new Vector3(1, 1, -1));
@@ -434,6 +497,13 @@ namespace ShadowOnlyShader
         {
             float near = _nearClipPlane;
             float far = _farClipPlane;
+
+            if (_projectionMode == ProjectionMode.Point)
+            {
+                // Cube face projection: FOV 90° fixed, 1:1 aspect ratio.
+                // 全6面で同一のProjection行列を共有する
+                return Matrix4x4.Perspective(PointFaceFieldOfView, 1f, near, far);
+            }
 
             if (_projectionMode == ProjectionMode.Perspective)
             {
@@ -520,8 +590,8 @@ namespace ShadowOnlyShader
                     // Directional lightにはrangeの概念がないため、farClipPlaneは既存値を維持
                     break;
                 case LightType.Point:
-                    // Point lightは全方向なのでPerspectiveで近似
-                    _projectionMode = ProjectionMode.Perspective;
+                    // Point lightは全方向: 90°×6面のキューブ投影で全方向をカバー
+                    _projectionMode = ProjectionMode.Point;
                     _farClipPlane = _sourceLight.range;
                     break;
             }

@@ -11,7 +11,7 @@ namespace ShadowOnlyShader
     public interface IVirtualLight
     {
         /// <summary>
-        /// 投影方式。OrthographicまたはPerspectiveを選択する。
+        /// 投影方式。Orthographic / Perspective / Point（全方向、6面）を選択する。
         /// </summary>
         ProjectionMode ProjectionMode { get; set; }
 
@@ -152,6 +152,20 @@ namespace ShadowOnlyShader
         /// View * Projection行列（読み取り専用）。
         /// </summary>
         Matrix4x4 ViewProjectionMatrix { get; }
+
+        /// <summary>
+        /// この光源が消費する深度テクスチャのスライス数（読み取り専用）。
+        /// Orthographic/Perspectiveは1、Pointは6（キューブ6面）を返す。
+        /// </summary>
+        int SliceCount { get; }
+
+        /// <summary>
+        /// 指定スライス（面）のView行列を返す。
+        /// Pointモードでは面インデックス（0-5: +X/-X/+Y/-Y/+Z/-Z）ごとのView行列、
+        /// それ以外のモードではsliceIndexによらずViewMatrixと同じ行列を返す。
+        /// Projection行列は全スライス共通でProjectionMatrixを使用する。
+        /// </summary>
+        Matrix4x4 GetSliceViewMatrix(int sliceIndex);
 
         /// <summary>
         /// CasterRoot配下の全Rendererを再収集する。

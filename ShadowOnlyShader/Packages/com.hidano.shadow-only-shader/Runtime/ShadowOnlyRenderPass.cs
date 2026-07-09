@@ -19,19 +19,19 @@ namespace ShadowOnlyShader
         /// </summary>
         internal class PassData
         {
-            /// <summary>View行列のリスト（各VirtualLight分）。</summary>
+            /// <summary>View行列のリスト（各スライス分。Pointモードの光源は6面分）。</summary>
             public List<Matrix4x4> viewMatrices = new List<Matrix4x4>();
 
-            /// <summary>Projection行列のリスト（各VirtualLight分）。</summary>
+            /// <summary>Projection行列のリスト（各スライス分）。</summary>
             public List<Matrix4x4> projectionMatrices = new List<Matrix4x4>();
 
             /// <summary>深度Texture2DArray（全VirtualLight共通）。</summary>
             public RenderTexture depthArrayTexture;
 
-            /// <summary>描画対象のライト数。</summary>
+            /// <summary>描画対象のスライス数（Pointモードの光源は6としてカウント）。</summary>
             public int lightCount;
 
-            /// <summary>キャスターRendererリストのリスト（各VirtualLight分）。</summary>
+            /// <summary>キャスターRendererリストのリスト（各スライス分。同一光源の面間で共有される）。</summary>
             public List<List<Renderer>> casterRendererLists = new List<List<Renderer>>();
 
             /// <summary>深度描画に使用するDepthOnly Material。</summary>
@@ -144,12 +144,20 @@ namespace ShadowOnlyShader
             }
 
             var virtualLights = _manager.VirtualLights;
-            int validCount = 0;
+            int sliceIndex = 0;
 
-            for (int i = 0; i < virtualLights.Count && validCount < ShadowOnlyManager.MaxVirtualLights; i++)
+            for (int i = 0; i < virtualLights.Count; i++)
             {
                 var vl = virtualLights[i] as VirtualLight;
                 if (vl == null || !vl.isActiveAndEnabled)
+                {
+                    continue;
+                }
+
+                // 残りスライスに収まらない光源はスキップ
+                // （ManagerのCountActiveVirtualLights / UpdateMaterialPropertiesと同一規則）
+                int sliceCount = vl.SliceCount;
+                if (sliceIndex + sliceCount > ShadowOnlyManager.MaxVirtualLights)
                 {
                     continue;
                 }
@@ -172,15 +180,20 @@ namespace ShadowOnlyShader
                     }
                 }
 
-                // Rendererが0件でも深度テクスチャのクリアが必要なためスキップしない
-                passData.viewMatrices.Add(vl.ViewMatrix);
-                passData.projectionMatrices.Add(vl.ProjectionMatrix);
-                passData.casterRendererLists.Add(validRenderers);
-                validCount++;
+                // Rendererが0件でも深度テクスチャのクリアが必要なためスキップしない。
+                // Pointモードの光源は6面分のスライスを登録する（キャスターリストは共有、
+                // View行列のみ面ごとに異なり、Projection行列は全面共通）
+                for (int face = 0; face < sliceCount; face++)
+                {
+                    passData.viewMatrices.Add(vl.GetSliceViewMatrix(face));
+                    passData.projectionMatrices.Add(vl.ProjectionMatrix);
+                    passData.casterRendererLists.Add(validRenderers);
+                    sliceIndex++;
+                }
             }
 
-            passData.lightCount = validCount;
-            return validCount > 0;
+            passData.lightCount = sliceIndex;
+            return sliceIndex > 0;
         }
 
         #endregion

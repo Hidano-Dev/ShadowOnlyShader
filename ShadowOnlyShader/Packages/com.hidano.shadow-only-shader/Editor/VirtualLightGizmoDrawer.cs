@@ -5,7 +5,8 @@ namespace ShadowOnlyShader.Editor
 {
     /// <summary>
     /// VirtualLightの方向・描画範囲をSceneビューでGizmoとして表示する。
-    /// Orthographicの場合は矩形、Perspectiveの場合は錐台を描画する。
+    /// Orthographicの場合は矩形、Perspectiveの場合は錐台、
+    /// Pointの場合は全方向を示すワイヤー球を描画する。
     /// Near/Farクリップ面の視覚化を含む。
     /// </summary>
     public static class VirtualLightGizmoDrawer
@@ -48,7 +49,7 @@ namespace ShadowOnlyShader.Editor
                         far = light.range;
                         break;
                     case LightType.Point:
-                        projMode = ProjectionMode.Perspective;
+                        projMode = ProjectionMode.Point;
                         fov = virtualLight.FieldOfView;
                         orthoSize = virtualLight.OrthographicSize;
                         far = light.range;
@@ -70,7 +71,14 @@ namespace ShadowOnlyShader.Editor
                 far = virtualLight.FarClipPlane;
             }
 
-            if (projMode == ProjectionMode.Orthographic)
+            if (projMode == ProjectionMode.Point)
+            {
+                // Pointモードの投影はワールド軸基準で回転に依存しないため、
+                // 回転を含まない行列で描画する
+                Gizmos.matrix = Matrix4x4.Translate(drawTransform.position);
+                DrawPointGizmo(near, far);
+            }
+            else if (projMode == ProjectionMode.Orthographic)
             {
                 DrawOrthographicGizmo(orthoSize, near, far);
             }
@@ -119,6 +127,18 @@ namespace ShadowOnlyShader.Editor
             Gizmos.DrawLine(new Vector3(nearHalf, -nearHalf, near), new Vector3(farHalf, -farHalf, far));
             Gizmos.DrawLine(new Vector3(nearHalf, nearHalf, near), new Vector3(farHalf, farHalf, far));
             Gizmos.DrawLine(new Vector3(-nearHalf, nearHalf, near), new Vector3(-farHalf, farHalf, far));
+        }
+
+        private static void DrawPointGizmo(float near, float far)
+        {
+            // 全方向投影の範囲をワイヤー球で表示（外側=Far、内側=Near）
+            Gizmos.DrawWireSphere(Vector3.zero, far);
+
+            // Near球は小さすぎると視認できないため、意味のある大きさの場合のみ描画
+            if (near > 0.01f)
+            {
+                Gizmos.DrawWireSphere(Vector3.zero, near);
+            }
         }
 
         private static void DrawWireRect(Vector3 center, float halfWidth, float halfHeight)

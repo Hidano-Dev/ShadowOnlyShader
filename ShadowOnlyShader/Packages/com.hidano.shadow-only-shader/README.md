@@ -63,7 +63,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 
 | パラメータ | 説明 |
 |-----------|------|
-| Projection Mode | 投影方式 (Orthographic / Perspective) |
+| Projection Mode | 投影方式 (Orthographic / Perspective / Point)。Point は FOV 90°×6 面で全方向に影を投影（深度テクスチャを 6 スライス使用） |
 | Shadow Color | 影の色 |
 | Shadow Alpha | 影の不透明度 (0.0〜1.0) |
 | Blur Radius | ぼかしの強さ |
@@ -82,7 +82,8 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 ## 特徴
 
 - **非破壊レンダリング** — 対象オブジェクトの Layer やマテリアルを一切変更しません
-- **複数光源対応** — 仮想光源を最大 32 個配置して独立した影を重ね合わせ可能
+- **複数光源対応** — 仮想光源を最大 32 スライス分（通常光源 1 個 = 1 スライス、Point 光源 1 個 = 6 スライス）配置して独立した影を重ね合わせ可能
+- **ポイントライト対応** — Point モード（90°×6 面のキューブ投影）で全方向に影を投影。Unity の Point Light との自動同期にも対応
 - **SkinnedMeshRenderer 対応** — アニメーション中のキャラクターの影もリアルタイムに描画
 - **低解像度 Resolve** — ブラー等の重い計算を低解像度 RT で事前実行し、GPU 負荷を大幅削減
 - **Source Light 同期** — Unity Light コンポーネントと連動し、位置・投影・影の濃さを自動同期
@@ -95,7 +96,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 
 - Renderer Feature の未登録・無効化（Quality 設定側 URP アセットの差し替え漏れを含む）
 - Play モードでないため影が更新されない
-- 仮想光源・床面 Renderer の未設定や非アクティブ、上限（32 個）超過
+- 仮想光源・床面 Renderer の未設定や非アクティブ、上限（32 スライス）超過
 - 床面が光源の投影範囲（フラスタム）の外にある
 - `Blend Multiplier` が 0 で影が透明になっている
 - 共有深度テクスチャの解像度過大（GPU メモリ警告。設定の出どころと修正手順を表示）など

@@ -5,6 +5,19 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.7.0] - 2026-07-10
+
+### 追加
+
+- ポイントライト（全方向）対応: `ProjectionMode.Point` を追加
+  - FOV 90° の透視投影 6 面（±X/±Y/±Z、ワールド軸基準）で全方向に影を投影する。従来は Point ライトが単一の Perspective 投影（デフォルト FOV 60°、正面方向のみ）で近似されており、視錐台に入ったキャスターしか影が出なかった
+  - 面の向きはワールド軸固定のため、光源の Transform を回転させても影は変化しない（ポイントライトとして物理的に正しい挙動）
+  - `SourceLight` に Point タイプの Light を設定すると `ProjectionMode.Point` に自動同期し、`range` が Far Clip Plane に反映される
+  - Point モードの光源は深度 Texture2DArray を 6 スライス消費する（同時描画上限 32 スライスのため、Point ライトは最大 5 個 + 通常光源 2 個など）。残りスライスに収まらない光源は丸ごとスキップされ、後続の小さい光源は描画される
+  - `IVirtualLight` に `SliceCount` プロパティと `GetSliceViewMatrix(int)` メソッドを追加
+  - Inspector: Point モード時は FOV / Orthographic Size を非表示にし、6 スライス消費の注記を表示。Scene ビューの Gizmo は Near/Far 範囲をワイヤー球で表示
+  - 診断: キャスター・床面の投影範囲判定を 6 面フラスタムに対応し、上限超過警告をスライス数ベースに変更
+
 ## [0.6.0] - 2026-07-09
 
 ### 変更

@@ -238,6 +238,147 @@ namespace ShadowOnlyShader.Tests.Editor
 
         #endregion
 
+        #region Point（キューブ6面）テスト
+
+        [Test]
+        public void SliceCount_Pointモード_6を返す()
+        {
+            _virtualLight.ProjectionMode = ProjectionMode.Point;
+            Assert.AreEqual(6, _virtualLight.SliceCount, "PointモードのSliceCountは6であるべき");
+        }
+
+        [Test]
+        public void SliceCount_OrthographicとPerspective_1を返す()
+        {
+            _virtualLight.ProjectionMode = ProjectionMode.Orthographic;
+            Assert.AreEqual(1, _virtualLight.SliceCount, "OrthographicのSliceCountは1であるべき");
+
+            _virtualLight.ProjectionMode = ProjectionMode.Perspective;
+            Assert.AreEqual(1, _virtualLight.SliceCount, "PerspectiveのSliceCountは1であるべき");
+        }
+
+        [Test]
+        public void UpdateMatrices_Point_FOV90の透視投影行列が生成される()
+        {
+            // Arrange
+            _virtualLight.ProjectionMode = ProjectionMode.Point;
+            _virtualLight.NearClipPlane = 0.1f;
+            _virtualLight.FarClipPlane = 20f;
+
+            // Act
+            _virtualLight.UpdateMatrices();
+
+            // Assert: 6面共通のProjection行列はFOV 90°・アスペクト比1:1
+            Matrix4x4 expected = Matrix4x4.Perspective(90f, 1f, 0.1f, 20f);
+            AssertMatricesAreEqual(expected, _virtualLight.ProjectionMatrix, 0.001f,
+                "PointモードのProjection行列はFOV 90°のPerspectiveであるべき");
+        }
+
+        [Test]
+        public void UpdateMatrices_Point_6面のView行列が全方向をカバーする()
+        {
+            // Arrange: 原点に配置
+            _gameObject.transform.position = Vector3.zero;
+            _gameObject.transform.rotation = Quaternion.identity;
+            _virtualLight.ProjectionMode = ProjectionMode.Point;
+
+            // Act
+            _virtualLight.UpdateMatrices();
+
+            // Assert: ワールド6軸方向の点が、いずれかの面のView空間で正面（-Z）に来る。
+            // View行列の規約では視線方向のワールド点は view.z = -distance に変換される
+            Vector3[] worldDirections =
+            {
+                Vector3.right, Vector3.left, Vector3.up,
+                Vector3.down, Vector3.forward, Vector3.back,
+            };
+
+            const float distance = 5f;
+            foreach (var dir in worldDirections)
+            {
+                bool covered = false;
+                for (int face = 0; face < 6; face++)
+                {
+                    Vector3 viewPos = _virtualLight.GetSliceViewMatrix(face)
+                        .MultiplyPoint3x4(dir * distance);
+                    if (Mathf.Abs(viewPos.z + distance) < 0.001f
+                        && Mathf.Abs(viewPos.x) < 0.001f
+                        && Mathf.Abs(viewPos.y) < 0.001f)
+                    {
+                        covered = true;
+                        break;
+                    }
+                }
+                Assert.IsTrue(covered, $"方向 {dir} を正面に捉える面が存在するべき");
+            }
+        }
+
+        [Test]
+        public void UpdateMatrices_Point_View行列はTransformの回転に依存しない()
+        {
+            // Arrange
+            _gameObject.transform.position = new Vector3(1f, 2f, 3f);
+            _gameObject.transform.rotation = Quaternion.identity;
+            _virtualLight.ProjectionMode = ProjectionMode.Point;
+            _virtualLight.UpdateMatrices();
+
+            var beforeRotation = new Matrix4x4[6];
+            for (int face = 0; face < 6; face++)
+            {
+                beforeRotation[face] = _virtualLight.GetSliceViewMatrix(face);
+            }
+
+            // Act: 回転を変更して再計算
+            _gameObject.transform.rotation = Quaternion.Euler(30f, 60f, 90f);
+            _virtualLight.UpdateMatrices();
+
+            // Assert: 全面のView行列が回転前と一致する（ポイントライトは全方向均等）
+            for (int face = 0; face < 6; face++)
+            {
+                AssertMatricesAreEqual(beforeRotation[face], _virtualLight.GetSliceViewMatrix(face),
+                    0.001f, $"面{face}のView行列は回転に依存しないべき");
+            }
+        }
+
+        [Test]
+        public void GetSliceViewMatrix_非Pointモード_ViewMatrixと同じ行列を返す()
+        {
+            // Arrange
+            _gameObject.transform.position = new Vector3(2f, 4f, 6f);
+            _virtualLight.ProjectionMode = ProjectionMode.Perspective;
+
+            // Act
+            _virtualLight.UpdateMatrices();
+
+            // Assert: どのスライスインデックスでもViewMatrixと一致
+            AssertMatricesAreEqual(_virtualLight.ViewMatrix, _virtualLight.GetSliceViewMatrix(0),
+                0.001f, "非PointモードのGetSliceViewMatrix(0)はViewMatrixと一致するべき");
+            AssertMatricesAreEqual(_virtualLight.ViewMatrix, _virtualLight.GetSliceViewMatrix(5),
+                0.001f, "非PointモードのGetSliceViewMatrix(5)もViewMatrixと一致するべき");
+        }
+
+        [Test]
+        public void UpdateMatrices_Point_位置オフセットが全面のView行列に反映される()
+        {
+            // Arrange
+            var position = new Vector3(3f, 5f, 7f);
+            _gameObject.transform.position = position;
+            _virtualLight.ProjectionMode = ProjectionMode.Point;
+
+            // Act
+            _virtualLight.UpdateMatrices();
+
+            // Assert: 光源位置自身は全面でView空間の原点に変換される
+            for (int face = 0; face < 6; face++)
+            {
+                Vector3 viewPos = _virtualLight.GetSliceViewMatrix(face).MultiplyPoint3x4(position);
+                Assert.AreEqual(0f, viewPos.magnitude, 0.001f,
+                    $"面{face}: 光源位置はView空間の原点に変換されるべき");
+            }
+        }
+
+        #endregion
+
         #region ヘルパーメソッド
 
         /// <summary>

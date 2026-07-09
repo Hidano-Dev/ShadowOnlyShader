@@ -14,8 +14,10 @@ namespace ShadowOnlyShader
     public class ShadowOnlyManager : MonoBehaviour, IShadowOnlyManager
     {
         /// <summary>
-        /// 同時に描画できる仮想光源の最大数。
+        /// 同時に描画できる深度スライスの最大数。
         /// UnityのLight数制限とは無関係で、本パッケージのシェーダーuniform配列サイズに由来する。
+        /// Orthographic/Perspectiveの仮想光源は1スライス、Pointは6スライスを消費する。
+        /// 残りスライスに収まらない光源は丸ごとスキップされる（後続の小さい光源は描画され得る）。
         /// 変更する場合はShadowOnlyFloorCommon.hlslのMAX_VIRTUAL_LIGHTSも同じ値にすること。
         /// </summary>
         internal const int MaxVirtualLights = 32;
@@ -110,7 +112,8 @@ namespace ShadowOnlyShader
         private bool _warnedMultipleManagers;
 
         /// <summary>
-        /// 現在アクティブなVirtualLightの数（ResolvePassから参照される）。
+        /// 現在描画対象になっている深度スライスの総数（ResolvePassから参照される）。
+        /// Pointモードの光源は6スライスとして数えられる。
         /// UpdateMaterialPropertiesで毎フレーム更新される。
         /// </summary>
         internal int ActiveVirtualLightCount { get; private set; }
@@ -372,18 +375,28 @@ namespace ShadowOnlyShader
         }
 
         /// <summary>
-        /// アクティブなVirtualLightの数を返す（最大MaxVirtualLights）。
+        /// アクティブなVirtualLightが必要とする深度スライスの総数を返す（最大MaxVirtualLights）。
+        /// Pointモードの光源は6スライスとして数える。
+        /// 残りスライスに収まらない光源はスキップする
+        /// （UpdateMaterialProperties / RenderPassのスライス割り当てと同一規則）。
         /// </summary>
         private int CountActiveVirtualLights()
         {
             int count = 0;
-            for (int i = 0; i < _virtualLights.Count && count < MaxVirtualLights; i++)
+            for (int i = 0; i < _virtualLights.Count; i++)
             {
                 var vl = _virtualLights[i];
-                if (vl != null && vl.isActiveAndEnabled)
+                if (vl == null || !vl.isActiveAndEnabled)
                 {
-                    count++;
+                    continue;
                 }
+
+                int slices = vl.SliceCount;
+                if (count + slices > MaxVirtualLights)
+                {
+                    continue;
+                }
+                count += slices;
             }
             return count;
         }
@@ -529,12 +542,14 @@ namespace ShadowOnlyShader
             // グローバルパラメータの設定
             _floorMaterial.SetFloat("_BlendMultiplier", _blendMultiplier);
 
-            // 各VirtualLightのパラメータを配列に収集
+            // 各VirtualLightのパラメータをスライス単位で配列に収集する。
+            // Pointモードの光源は6面（6スライス）分のエントリを登録し、
+            // 面ごとにView行列のみが異なる（外観パラメータは全面共通）。
             // 破棄済みVirtualLightの検出用フラグ
             bool needsRefresh = false;
-            int validLightIndex = 0;
+            int sliceIndex = 0;
 
-            for (int i = 0; i < _virtualLights.Count && validLightIndex < MaxVirtualLights; i++)
+            for (int i = 0; i < _virtualLights.Count; i++)
             {
                 var vl = _virtualLights[i];
 
@@ -551,58 +566,62 @@ namespace ShadowOnlyShader
                     continue;
                 }
 
-                // VP行列（GPU変換済み）
-                // GL.GetGPUProjectionMatrixでプラットフォーム固有のProjection行列に変換し、
-                // 深度RenderPassと同じ変換を適用することで深度値の一致を保証する
-                var gpuProj = GL.GetGPUProjectionMatrix(vl.ProjectionMatrix, true);
-                _lightVPMatrices[validLightIndex] = gpuProj * vl.ViewMatrix;
+                // 残りスライスに収まらない光源はスキップ
+                // （CountActiveVirtualLights / RenderPassのスライス割り当てと同一規則）
+                int sliceCount = vl.SliceCount;
+                if (sliceIndex + sliceCount > MaxVirtualLights)
+                {
+                    continue;
+                }
 
-                // 影色
+                // スライス間で共通のパラメータを先に取得
                 Color sc = vl.ShadowColor;
-                _shadowColors[validLightIndex] = new Vector4(sc.r, sc.g, sc.b, sc.a);
-
-                // 影の濃さ
-                _shadowAlphas[validLightIndex] = vl.ShadowAlpha;
-
-                // 深度バイアス
-                _depthBiases[validLightIndex] = vl.DepthBias;
-
-                // ブラー関連
-                _blurRadii[validLightIndex] = vl.BlurRadius;
-                _blurDistanceFactors[validLightIndex] = vl.BlurDistanceFactor;
-                _blurCameraDistanceFactors[validLightIndex] = vl.BlurCameraDistanceFactor;
-                _cameraDistancePowers[validLightIndex] = vl.CameraDistancePower;
-                _alphaCameraDistanceFactors[validLightIndex] = vl.AlphaCameraDistanceFactor;
-
-                // Hue Shift
-                _hueShifts[validLightIndex] = vl.HueShift;
-
-                // 色収差
-                _chromaticAberrations[validLightIndex] = vl.ChromaticAberration;
+                var shadowColor = new Vector4(sc.r, sc.g, sc.b, sc.a);
                 Color caColor = vl.EffectiveChromaticAberrationColor;
-                _chromaticAberrationColors[validLightIndex] = new Vector4(caColor.r, caColor.g, caColor.b, caColor.a);
-
-                // コンタクトハードニング（PCSS）
-                _contactHardeningStrengths[validLightIndex] = vl.ContactHardeningStrength;
-
-                // 光源ワールド位置（距離ボケ計算用）
+                var chromaticAberrationColor = new Vector4(caColor.r, caColor.g, caColor.b, caColor.a);
                 Vector3 pos = vl.transform.position;
-                _lightWorldPositions[validLightIndex] = new Vector4(pos.x, pos.y, pos.z, 1f);
+                var lightWorldPosition = new Vector4(pos.x, pos.y, pos.z, 1f);
 
-                // テクスチャサイズ（全スライス共通解像度）
+                // GL.GetGPUProjectionMatrixでプラットフォーム固有のProjection行列に変換し、
+                // 深度RenderPassと同じ変換を適用することで深度値の一致を保証する。
+                // Projection行列は全スライス共通（PointモードはFOV 90°固定）
+                var gpuProj = GL.GetGPUProjectionMatrix(vl.ProjectionMatrix, true);
+
+                Vector4 depthTexSize = Vector4.zero;
                 if (_depthArrayTexture != null)
                 {
                     float w = _depthArrayTexture.width;
                     float h = _depthArrayTexture.height;
-                    _depthTexSizes[validLightIndex] = new Vector4(w, h, 1f / w, 1f / h);
+                    depthTexSize = new Vector4(w, h, 1f / w, 1f / h);
                 }
 
-                validLightIndex++;
+                for (int face = 0; face < sliceCount; face++)
+                {
+                    // VP行列（GPU変換済み）: 面ごとにView行列のみが異なる
+                    _lightVPMatrices[sliceIndex] = gpuProj * vl.GetSliceViewMatrix(face);
+
+                    _shadowColors[sliceIndex] = shadowColor;
+                    _shadowAlphas[sliceIndex] = vl.ShadowAlpha;
+                    _depthBiases[sliceIndex] = vl.DepthBias;
+                    _blurRadii[sliceIndex] = vl.BlurRadius;
+                    _blurDistanceFactors[sliceIndex] = vl.BlurDistanceFactor;
+                    _blurCameraDistanceFactors[sliceIndex] = vl.BlurCameraDistanceFactor;
+                    _cameraDistancePowers[sliceIndex] = vl.CameraDistancePower;
+                    _alphaCameraDistanceFactors[sliceIndex] = vl.AlphaCameraDistanceFactor;
+                    _hueShifts[sliceIndex] = vl.HueShift;
+                    _chromaticAberrations[sliceIndex] = vl.ChromaticAberration;
+                    _chromaticAberrationColors[sliceIndex] = chromaticAberrationColor;
+                    _contactHardeningStrengths[sliceIndex] = vl.ContactHardeningStrength;
+                    _lightWorldPositions[sliceIndex] = lightWorldPosition;
+                    _depthTexSizes[sliceIndex] = depthTexSize;
+
+                    sliceIndex++;
+                }
             }
 
-            // 実際の有効な光源数を設定（破棄済みを除外した数）
-            ActiveVirtualLightCount = validLightIndex;
-            _floorMaterial.SetInt("_VirtualLightCount", validLightIndex);
+            // 実際に描画対象となるスライス数を設定（破棄済み・非アクティブ・上限超過を除外した数）
+            ActiveVirtualLightCount = sliceIndex;
+            _floorMaterial.SetInt("_VirtualLightCount", sliceIndex);
 
             // 配列パラメータを一括設定（SetXxx × 8回 → SetXxxArray × 1回に集約）
             _floorMaterial.SetMatrixArray("_LightVPMatrices", _lightVPMatrices);

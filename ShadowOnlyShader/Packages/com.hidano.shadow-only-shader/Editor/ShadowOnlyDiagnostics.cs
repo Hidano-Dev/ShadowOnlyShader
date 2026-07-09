@@ -97,8 +97,9 @@ namespace ShadowOnlyShader.Editor
             CheckManagerState(manager, issues);
 
             // アクティブなVirtualLightと、その投影フラスタム平面を収集
+            // （Pointモードの光源は6面分のフラスタムを持つ）
             var activeLights = new List<VirtualLight>();
-            var lightFrustums = new List<Plane[]>();
+            var lightFrustums = new List<Plane[][]>();
             CheckVirtualLights(manager, issues, activeLights, lightFrustums);
             CheckFloorRenderers(manager, issues, activeLights, lightFrustums);
             CheckOrphanVirtualLights(manager, issues);
@@ -142,10 +143,41 @@ namespace ShadowOnlyShader.Editor
 
             // Editモードでは行列がLateUpdateで更新されないため、ここで明示的に計算する
             light.UpdateMatrices();
-            var frustum = GeometryUtility.CalculateFrustumPlanes(light.ProjectionMatrix * light.ViewMatrix);
-            CollectLightIssues(light, frustum, issues);
+            CollectLightIssues(light, CalculateLightFrustums(light), issues);
 
             return SortBySeverity(issues);
+        }
+
+        /// <summary>
+        /// 光源の全スライス分の投影フラスタム平面を計算する。
+        /// Orthographic/Perspectiveは1面、Pointは6面を返す。
+        /// 呼び出し前にUpdateMatrices()を実行しておくこと。
+        /// </summary>
+        private static Plane[][] CalculateLightFrustums(VirtualLight light)
+        {
+            int sliceCount = light.SliceCount;
+            var frustums = new Plane[sliceCount][];
+            for (int i = 0; i < sliceCount; i++)
+            {
+                frustums[i] = GeometryUtility.CalculateFrustumPlanes(
+                    light.ProjectionMatrix * light.GetSliceViewMatrix(i));
+            }
+            return frustums;
+        }
+
+        /// <summary>
+        /// Boundsが光源のいずれかのスライスのフラスタムと交差するかを判定する。
+        /// </summary>
+        private static bool IntersectsAnyFrustum(Plane[][] frustums, Bounds bounds)
+        {
+            foreach (var frustum in frustums)
+            {
+                if (GeometryUtility.TestPlanesAABB(frustum, bounds))
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -396,7 +428,7 @@ namespace ShadowOnlyShader.Editor
             ShadowOnlyManager manager,
             List<DiagnosticIssue> issues,
             List<VirtualLight> activeLights,
-            List<Plane[]> lightFrustums)
+            List<Plane[][]> lightFrustums)
         {
             var allLights = manager.GetComponentsInChildren<VirtualLight>(true);
 
@@ -424,12 +456,27 @@ namespace ShadowOnlyShader.Editor
                 return;
             }
 
-            if (activeLights.Count > ShadowOnlyManager.MaxVirtualLights)
+            // 深度スライスの消費量で上限を判定する（Pointモードの光源は6スライス消費）
+            int totalSlices = 0;
+            int pointLightCount = 0;
+            foreach (var vl in activeLights)
             {
+                totalSlices += vl.SliceCount;
+                if (vl.ProjectionMode == ProjectionMode.Point)
+                {
+                    pointLightCount++;
+                }
+            }
+
+            if (totalSlices > ShadowOnlyManager.MaxVirtualLights)
+            {
+                string pointHint = pointLightCount > 0
+                    ? $"（Pointモードの光源{pointLightCount}個はそれぞれ6スライスを消費します）"
+                    : "";
                 Add(issues, DiagnosticSeverity.Warning,
-                    $"アクティブな仮想光源が{activeLights.Count}個あります。" +
-                    $"同時に描画できるのは{ShadowOnlyManager.MaxVirtualLights}個までのため、" +
-                    $"先頭の{ShadowOnlyManager.MaxVirtualLights}個のみが描画されます。");
+                    $"アクティブな仮想光源が合計{totalSlices}スライス分あります{pointHint}。" +
+                    $"同時に描画できるのは{ShadowOnlyManager.MaxVirtualLights}スライスまでのため、" +
+                    "上限に収まらない光源は描画されません。");
             }
 
             // 各光源の個別診断はVirtualLight側のInspectorに表示するため、
@@ -445,11 +492,11 @@ namespace ShadowOnlyShader.Editor
             {
                 // Editモードでは行列がLateUpdateで更新されないため、ここで明示的に計算する
                 vl.UpdateMatrices();
-                var frustum = GeometryUtility.CalculateFrustumPlanes(vl.ProjectionMatrix * vl.ViewMatrix);
-                lightFrustums.Add(frustum);
+                var frustums = CalculateLightFrustums(vl);
+                lightFrustums.Add(frustums);
 
                 lightIssues.Clear();
-                CollectLightIssues(vl, frustum, lightIssues);
+                CollectLightIssues(vl, frustums, lightIssues);
 
                 bool hasProblem = false;
                 foreach (var issue in lightIssues)
@@ -518,7 +565,13 @@ namespace ShadowOnlyShader.Editor
                 return;
             }
 
-            int sliceCount = Mathf.Min(activeLights.Count, ShadowOnlyManager.MaxVirtualLights);
+            // Pointモードの光源は6スライス消費するため、実際のスライス数で見積もる
+            int requiredSlices = 0;
+            foreach (var vl in activeLights)
+            {
+                requiredSlices += vl.SliceCount;
+            }
+            int sliceCount = Mathf.Min(requiredSlices, ShadowOnlyManager.MaxVirtualLights);
             long totalBytes = (long)resolution * resolution * 4 * sliceCount;
 
             string source;
@@ -541,7 +594,7 @@ namespace ShadowOnlyShader.Editor
 
             Add(issues, DiagnosticSeverity.Warning,
                 $"深度テクスチャ解像度が{resolution}×{resolution}と非常に大きく、" +
-                $"{sliceCount}ライト分で約{totalBytes / (1024 * 1024)}MBのGPUメモリを消費します" +
+                $"{sliceCount}スライス分で約{totalBytes / (1024 * 1024)}MBのGPUメモリを消費します" +
                 "（メモリ確保に失敗すると影が表示されなくなります）。" +
                 $"この値は{source}に由来します。{fixHint}");
         }
@@ -551,7 +604,7 @@ namespace ShadowOnlyShader.Editor
         /// 結果はVirtualLightEditorのInspectorに表示されるほか、
         /// Manager側では件数の集約に使用される。
         /// </summary>
-        private static void CollectLightIssues(VirtualLight vl, Plane[] frustum, List<DiagnosticIssue> issues)
+        private static void CollectLightIssues(VirtualLight vl, Plane[][] frustums, List<DiagnosticIssue> issues)
         {
             // --- キャスター設定 ---
             if (vl.CasterRoot == null)
@@ -570,7 +623,7 @@ namespace ShadowOnlyShader.Editor
                 }
                 else
                 {
-                    CheckCasterVisibilityAndFrustum(vl, renderers, frustum, issues);
+                    CheckCasterVisibilityAndFrustum(vl, renderers, frustums, issues);
                 }
             }
 
@@ -611,7 +664,7 @@ namespace ShadowOnlyShader.Editor
         private static void CheckCasterVisibilityAndFrustum(
             VirtualLight vl,
             Renderer[] renderers,
-            Plane[] frustum,
+            Plane[][] frustums,
             List<DiagnosticIssue> issues)
         {
             int visibleCount = 0;
@@ -625,7 +678,7 @@ namespace ShadowOnlyShader.Editor
                 }
 
                 visibleCount++;
-                if (GeometryUtility.TestPlanesAABB(frustum, renderer.bounds))
+                if (IntersectsAnyFrustum(frustums, renderer.bounds))
                 {
                     insideCount++;
                 }
@@ -641,12 +694,22 @@ namespace ShadowOnlyShader.Editor
 
             if (insideCount == 0)
             {
-                string rangeHint = vl.ProjectionMode == ProjectionMode.Orthographic
-                    ? "Orthographic Size"
-                    : "Field Of View";
+                string hint;
+                switch (vl.ProjectionMode)
+                {
+                    case ProjectionMode.Orthographic:
+                        hint = "光源の位置・向き、Orthographic Size、Near/Far Clip Planeを確認してください。";
+                        break;
+                    case ProjectionMode.Point:
+                        // Pointは全方向をカバーするため、範囲外の原因は距離（Near/Far）のみ
+                        hint = "光源の位置と、Near/Far Clip Plane（影の届く距離）を確認してください。";
+                        break;
+                    default:
+                        hint = "光源の位置・向き、Field Of View、Near/Far Clip Planeを確認してください。";
+                        break;
+                }
                 Add(issues, DiagnosticSeverity.Warning,
-                    "すべてのキャスターが投影範囲（フラスタム）の外にあります。" +
-                    $"光源の位置・向き、{rangeHint}、Near/Far Clip Planeを確認してください。");
+                    $"すべてのキャスターが投影範囲（フラスタム）の外にあります。{hint}");
             }
             else if (insideCount < visibleCount)
             {
@@ -694,7 +757,7 @@ namespace ShadowOnlyShader.Editor
             ShadowOnlyManager manager,
             List<DiagnosticIssue> issues,
             List<VirtualLight> activeLights,
-            List<Plane[]> lightFrustums)
+            List<Plane[][]> lightFrustums)
         {
             var floors = manager.FloorRenderers;
 
@@ -750,7 +813,7 @@ namespace ShadowOnlyShader.Editor
             Renderer floor,
             List<DiagnosticIssue> issues,
             List<VirtualLight> activeLights,
-            List<Plane[]> lightFrustums)
+            List<Plane[][]> lightFrustums)
         {
             // 床がいずれかのCasterRoot配下に含まれる場合、床自身が影を落とし
             // 全面が影になる・ちらつくなどの異常の原因になる
@@ -771,9 +834,9 @@ namespace ShadowOnlyShader.Editor
             if (activeLights.Count > 0)
             {
                 bool intersectsAny = false;
-                foreach (var frustum in lightFrustums)
+                foreach (var frustums in lightFrustums)
                 {
-                    if (GeometryUtility.TestPlanesAABB(frustum, floor.bounds))
+                    if (IntersectsAnyFrustum(frustums, floor.bounds))
                     {
                         intersectsAny = true;
                         break;

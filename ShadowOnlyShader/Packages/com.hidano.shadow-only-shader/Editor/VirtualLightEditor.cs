@@ -159,10 +159,7 @@ namespace ShadowOnlyShader.Editor
                     ProjectionMode mode;
                     if (vlSourceLight.objectReferenceValue != null)
                     {
-                        var srcLight = vlSourceLight.objectReferenceValue as Light;
-                        mode = (srcLight != null && srcLight.type == LightType.Directional)
-                            ? ProjectionMode.Orthographic
-                            : ProjectionMode.Perspective;
+                        mode = ProjectionModeFromLight(vlSourceLight.objectReferenceValue as Light);
                     }
                     else
                     {
@@ -184,10 +181,7 @@ namespace ShadowOnlyShader.Editor
             }
             else if (hasSourceLight)
             {
-                var srcLight = _sourceLight.objectReferenceValue as Light;
-                effectiveProjectionMode = (srcLight != null && srcLight.type == LightType.Directional)
-                    ? ProjectionMode.Orthographic
-                    : ProjectionMode.Perspective;
+                effectiveProjectionMode = ProjectionModeFromLight(_sourceLight.objectReferenceValue as Light);
             }
             else
             {
@@ -214,16 +208,19 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
-                // Orthographic時はFieldOfViewを非表示、Perspective時はOrthographicSizeを非表示
+                // FieldOfViewはPerspective時のみ、OrthographicSizeはOrthographic時のみ表示する
+                // （PointはFOV 90°固定×6面のため両方とも非表示）。
                 // 投影モードが混在する場合は両方表示する
                 if (iterator.propertyPath == "_fieldOfView"
-                    && effectiveProjectionMode == ProjectionMode.Orthographic)
+                    && effectiveProjectionMode != null
+                    && effectiveProjectionMode != ProjectionMode.Perspective)
                 {
                     continue;
                 }
 
                 if (iterator.propertyPath == "_orthographicSize"
-                    && effectiveProjectionMode == ProjectionMode.Perspective)
+                    && effectiveProjectionMode != null
+                    && effectiveProjectionMode != ProjectionMode.Orthographic)
                 {
                     continue;
                 }
@@ -289,6 +286,15 @@ namespace ShadowOnlyShader.Editor
                         virtualLight.RestorePreSyncState();
                     }
                 }
+            }
+
+            if (effectiveProjectionMode == ProjectionMode.Point)
+            {
+                EditorGUILayout.HelpBox(
+                    "Point モード: FOV 90°×6面（±X/±Y/±Z）で全方向に影を投影します。" +
+                    "深度テクスチャを6スライス使用します" +
+                    $"（同時描画上限は{ShadowOnlyManager.MaxVirtualLights}スライス）。",
+                    MessageType.Info);
             }
 
             if (anyHasSourceLight)
@@ -546,6 +552,23 @@ namespace ShadowOnlyShader.Editor
         #endregion
 
         #region Utilities
+
+        /// <summary>
+        /// Unity Lightの種類から実効的な投影モードを求める。
+        /// SyncFromSourceLightの同期規則（Directional→Orthographic /
+        /// Spot→Perspective / Point→Point）と一致させる。
+        /// </summary>
+        private static ProjectionMode ProjectionModeFromLight(Light light)
+        {
+            if (light == null) return ProjectionMode.Perspective;
+
+            switch (light.type)
+            {
+                case LightType.Directional: return ProjectionMode.Orthographic;
+                case LightType.Point: return ProjectionMode.Point;
+                default: return ProjectionMode.Perspective;
+            }
+        }
 
         private static bool IsSyncedField(string propertyPath)
         {
