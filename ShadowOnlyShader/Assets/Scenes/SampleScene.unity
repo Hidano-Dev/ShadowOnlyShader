@@ -568,7 +568,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 663444613}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7, type: 3}
+  m_Script: {fileID: 11500000, guid: 3c867e7f64c14f159567ecddcfe1a99c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.VirtualLight
   _casterRoot: {fileID: 239774089}
@@ -677,7 +677,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1283377248}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6, type: 3}
+  m_Script: {fileID: 11500000, guid: e1bac4b1e75a4b4981dbfebd0c941131, type: 3}
   m_Name: 
   m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.ShadowOnlyManager
   _blurQuality: 1
@@ -747,7 +747,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1381080955}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7, type: 3}
+  m_Script: {fileID: 11500000, guid: 3c867e7f64c14f159567ecddcfe1a99c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.VirtualLight
   _casterRoot: {fileID: 239774089}
@@ -822,7 +822,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1678293181}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6a7, type: 3}
+  m_Script: {fileID: 11500000, guid: 3c867e7f64c14f159567ecddcfe1a99c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: com.hidano.shadow-only-shader::ShadowOnlyShader.VirtualLight
   _casterRoot: {fileID: 239774089}
