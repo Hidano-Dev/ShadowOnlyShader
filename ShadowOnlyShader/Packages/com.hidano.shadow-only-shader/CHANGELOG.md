@@ -5,6 +5,20 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.8.0] - 2026-07-10
+
+### 追加
+
+- Fit To Casters（投影範囲のキャスター自動追従）を追加
+  - VirtualLight に `Fit To Casters`（デフォルト無効）を追加。有効にすると Orthographic モードの投影範囲が、キャスター全体の合成 Bounds を覆うオフセンター正射影として毎フレーム自動算出される
+  - ライトの角度を変えてもキャスターが投影範囲から外れず、投影範囲が必要最小限に保たれるためテクセル密度が高くなる。広い `Orthographic Size`（テクセル実寸の粗さ）に起因するブラーの縞状ゴーストの実用的な対策になる
+  - 投影範囲には片側 10% の相対マージンに加え、ブラーカーネルが UV 外を参照しないよう `Blur Radius` × カーネル半径（Manager の Blur Quality に連動）分のテクセル余白を確保する
+  - 投影ウィンドウ中心を 1 テクセル単位に量子化（テクセルスナップ）し、光源・キャスター移動時の影の揺らぎ（shadow swimming）を抑制する
+  - 投影ウィンドウは正方形（テクセルが正方形）を維持し、ブラーの等方性を保つ
+  - キャスターが 1 つも存在しない場合は従来どおり `Orthographic Size` にフォールバックする。Perspective / Point モードでは無視される
+  - `IVirtualLight` に `FitToCasters` プロパティを追加
+  - Inspector: `Fit To Casters` は Orthographic 時のみ表示され、有効時は `Orthographic Size` をグレーアウトする。Scene ビューの Gizmo はフィット後の実際の投影範囲を表示する
+
 ## [0.7.1] - 2026-07-10
 
 ### 修正

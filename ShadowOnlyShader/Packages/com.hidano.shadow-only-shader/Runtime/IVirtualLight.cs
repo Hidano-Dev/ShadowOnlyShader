@@ -21,7 +21,17 @@ namespace ShadowOnlyShader
         float FieldOfView { get; set; }
 
         /// <summary>
+        /// Orthographic投影時に投影範囲をキャスター全体へ自動フィットさせるかどうか。
+        /// 有効時はOrthographicSizeの代わりに、キャスターの合成Boundsを覆う
+        /// オフセンター正射影（マージン・テクセルスナップ付き）が毎フレーム算出される。
+        /// キャスターが1つも存在しない場合はOrthographicSizeにフォールバックする。
+        /// Perspective / Pointモードでは無視される。
+        /// </summary>
+        bool FitToCasters { get; set; }
+
+        /// <summary>
         /// Orthographic投影時の投影サイズ。0より大きい値。
+        /// FitToCasters有効時は使用されない（キャスター不在時のフォールバックを除く）。
         /// </summary>
         float OrthographicSize { get; set; }
 

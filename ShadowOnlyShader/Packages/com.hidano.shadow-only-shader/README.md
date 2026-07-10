@@ -67,6 +67,7 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 | パラメータ | 説明 |
 |-----------|------|
 | Projection Mode | 投影方式 (Orthographic / Perspective / Point)。Point は FOV 90°×6 面で全方向に影を投影（深度テクスチャを 6 スライス使用） |
+| Fit To Casters | Orthographic 時に投影範囲をキャスター全体へ毎フレーム自動フィット。ライトの角度によらずキャスターが投影範囲に収まり、テクセル密度も高く保たれる（有効時 Orthographic Size は不使用） |
 | Shadow Color | 影の色 |
 | Shadow Alpha | 影の不透明度 (0.0〜1.0) |
 | Blur Radius | ぼかしの強さ |

@@ -79,6 +79,10 @@ namespace ShadowOnlyShader
         [Range(1f, 179f)]
         private float _fieldOfView = 60f;
 
+        [Tooltip("Orthographic モード時に、投影範囲をキャスター全体へ毎フレーム自動フィットさせます。ライトの角度によらずキャスターが常に投影範囲に収まり、テクセル密度も高く保たれます。有効時は Orthographic Size は使用されません")]
+        [SerializeField]
+        private bool _fitToCasters;
+
         [Tooltip("Orthographic モード時の投影範囲の半径。値が大きいほど広い範囲に影を投影できますが、解像度が粗くなります")]
         [SerializeField]
         [Min(0.001f)]
@@ -221,6 +225,18 @@ namespace ShadowOnlyShader
         /// </summary>
         private bool _wasSyncing;
 
+        /// <summary>
+        /// Fit To Castersで直近に算出した投影ウィンドウ（ビュー空間XY = ローカル空間XY）。
+        /// Gizmo表示用にキャッシュする。
+        /// </summary>
+        private Rect _fittedOrthoWindow;
+
+        /// <summary>
+        /// _fittedOrthoWindowが有効かどうか。
+        /// Fitが無効、Orthographic以外、キャスター不在でのフォールバック時はfalse。
+        /// </summary>
+        private bool _hasFittedOrthoWindow;
+
         #endregion
 
         #region IVirtualLight - Projection Parameters
@@ -237,6 +253,13 @@ namespace ShadowOnlyShader
         {
             get => _fieldOfView;
             set => _fieldOfView = Mathf.Clamp(value, 1f, 179f);
+        }
+
+        /// <inheritdoc />
+        public bool FitToCasters
+        {
+            get => _fitToCasters;
+            set => _fitToCasters = value;
         }
 
         /// <inheritdoc />
@@ -563,11 +586,15 @@ namespace ShadowOnlyShader
 
         /// <summary>
         /// ProjectionModeに応じたProjection行列を算出する。
+        /// Fit To Casters有効時は_viewMatrixを参照するため、
+        /// UpdateMatrices内でView行列の更新後に呼び出すこと。
         /// </summary>
         private Matrix4x4 CalculateProjectionMatrix()
         {
             float near = _nearClipPlane;
             float far = _farClipPlane;
+
+            _hasFittedOrthoWindow = false;
 
             if (_projectionMode == ProjectionMode.Point)
             {
@@ -583,9 +610,146 @@ namespace ShadowOnlyShader
             }
             else
             {
+                if (_fitToCasters && TryCalculateFittedOrthoProjection(near, far, out Matrix4x4 fitted))
+                {
+                    return fitted;
+                }
+
                 // Orthographic projection with 1:1 aspect ratio
                 float size = _orthographicSize;
                 return Matrix4x4.Ortho(-size, size, -size, size, near, far);
+            }
+        }
+
+        #endregion
+
+        #region Fit To Casters
+
+        /// <summary>
+        /// Fit To Casters時に投影範囲へ加える相対マージンの比率（片側10%）。
+        /// キャスターのアニメーションによるBoundsの微小変動を吸収する。
+        /// </summary>
+        private const float FitMarginRatio = 0.1f;
+
+        /// <summary>
+        /// ブラーカーネルの最大テクセル半径。
+        /// ShadowOnlyFloorCommon.hlslのBlurQuality High（13x13カーネル = 半径6テクセル）に対応し、
+        /// Managerを解決できない場合のフォールバックにも使用する。
+        /// </summary>
+        private const float MaxBlurKernelRadius = 6f;
+
+        /// <summary>
+        /// Fit To Castersで直近に算出した投影ウィンドウ（ビュー空間XY）を返す。
+        /// ビュー空間のXYはライトのローカル空間XYと一致するため、Gizmo描画にそのまま使用できる。
+        /// Fitが無効、またはキャスター不在でOrthographicSizeにフォールバックした場合はfalseを返す。
+        /// </summary>
+        internal bool TryGetFittedOrthoWindow(out Rect window)
+        {
+            window = _fittedOrthoWindow;
+            return _hasFittedOrthoWindow;
+        }
+
+        /// <summary>
+        /// キャスターRendererの合成Boundsをビュー空間へ変換し、
+        /// XY範囲を覆うオフセンター正射影行列を算出する。
+        /// 有効なキャスターが1つもない場合はfalseを返す（OrthographicSizeにフォールバック）。
+        /// </summary>
+        private bool TryCalculateFittedOrthoProjection(float near, float far, out Matrix4x4 projection)
+        {
+            projection = Matrix4x4.identity;
+            CollectRenderers();
+
+            bool hasBounds = false;
+            float minX = 0f, minY = 0f, maxX = 0f, maxY = 0f;
+
+            for (int i = 0; i < _casterRenderers.Count; i++)
+            {
+                var renderer = _casterRenderers[i];
+                // 深度パス（ShadowOnlyRenderPass.CollectPassData）と同じ条件で描画対象を絞る
+                if (renderer == null || !renderer.gameObject.activeInHierarchy || !renderer.enabled)
+                {
+                    continue;
+                }
+
+                // ワールドAABBの8頂点をビュー空間へ変換してXY範囲を蓄積する
+                // （AABBごと変換すると回転で範囲が過大になるため頂点単位で変換する）
+                Bounds bounds = renderer.bounds;
+                Vector3 bMin = bounds.min;
+                Vector3 bMax = bounds.max;
+                for (int corner = 0; corner < 8; corner++)
+                {
+                    Vector3 p = new Vector3(
+                        (corner & 1) == 0 ? bMin.x : bMax.x,
+                        (corner & 2) == 0 ? bMin.y : bMax.y,
+                        (corner & 4) == 0 ? bMin.z : bMax.z);
+                    Vector3 v = _viewMatrix.MultiplyPoint3x4(p);
+
+                    if (!hasBounds)
+                    {
+                        minX = maxX = v.x;
+                        minY = maxY = v.y;
+                        hasBounds = true;
+                    }
+                    else
+                    {
+                        if (v.x < minX) minX = v.x;
+                        if (v.x > maxX) maxX = v.x;
+                        if (v.y < minY) minY = v.y;
+                        if (v.y > maxY) maxY = v.y;
+                    }
+                }
+            }
+
+            if (!hasBounds)
+            {
+                return false;
+            }
+
+            float centerX = (minX + maxX) * 0.5f;
+            float centerY = (minY + maxY) * 0.5f;
+
+            // 正方形ウィンドウにする（テクセルを正方形に保ち、ブラーの等方性を維持する）
+            float halfBase = Mathf.Max(maxX - minX, maxY - minY) * 0.5f;
+
+            // 相対マージンに加え、ブラーカーネルがUV外を参照しないようカーネル半径分の
+            // テクセルを余白として確保する。テクセル実寸は最終サイズに依存するため閉形式で解く:
+            //   half = halfBase*(1+margin) + kernelTexels * (2*half/resolution)
+            int resolution = ResolveTextureResolution();
+            float kernelTexels = ResolveBlurKernelRadius() * _blurRadius + 1f; // +1はテクセルスナップのずれ分
+            float texelRatio = Mathf.Min(2f * kernelTexels / resolution, 0.5f);
+            float half = Mathf.Max(halfBase * (1f + FitMarginRatio) / (1f - texelRatio), 0.001f);
+
+            // テクセルスナップ: 投影ウィンドウ中心を1テクセル単位に量子化してshadow swimmingを防ぐ
+            float texelSize = 2f * half / resolution;
+            centerX = Mathf.Floor(centerX / texelSize) * texelSize;
+            centerY = Mathf.Floor(centerY / texelSize) * texelSize;
+
+            _fittedOrthoWindow = new Rect(centerX - half, centerY - half, half * 2f, half * 2f);
+            _hasFittedOrthoWindow = true;
+            projection = Matrix4x4.Ortho(
+                centerX - half, centerX + half,
+                centerY - half, centerY + half,
+                near, far);
+            return true;
+        }
+
+        /// <summary>
+        /// ManagerのBlurQualityに応じたブラーカーネルのテクセル半径を返す。
+        /// ShadowOnlyFloorCommon.hlslのカーネルサイズ（Low=5x5/Mid=9x9/High=13x13）に対応する。
+        /// </summary>
+        private float ResolveBlurKernelRadius()
+        {
+            var manager = ResolveManager();
+            if (manager == null)
+            {
+                return MaxBlurKernelRadius;
+            }
+
+            switch (manager.BlurQuality)
+            {
+                case BlurQuality.Low: return 2f;
+                case BlurQuality.Mid: return 4f;
+                default: return MaxBlurKernelRadius;
             }
         }
 

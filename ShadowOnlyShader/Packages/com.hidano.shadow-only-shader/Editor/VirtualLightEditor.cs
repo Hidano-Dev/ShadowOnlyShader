@@ -22,6 +22,7 @@ namespace ShadowOnlyShader.Editor
         private SerializedProperty _sourceLight;
         private SerializedProperty _chromaticAberrationColor;
         private SerializedProperty _projectionMode;
+        private SerializedProperty _fitToCasters;
         private SerializedProperty _textureResolution;
 
         // Shadow Color / Hue Shift
@@ -106,6 +107,7 @@ namespace ShadowOnlyShader.Editor
             _sourceLight = serializedObject.FindProperty("_sourceLight");
             _chromaticAberrationColor = serializedObject.FindProperty("_chromaticAberrationColor");
             _projectionMode = serializedObject.FindProperty("_projectionMode");
+            _fitToCasters = serializedObject.FindProperty("_fitToCasters");
             _textureResolution = serializedObject.FindProperty("_textureResolution");
 
             _shadowColor = serializedObject.FindProperty("_shadowColor");
@@ -234,10 +236,29 @@ namespace ShadowOnlyShader.Editor
                     continue;
                 }
 
-                if (iterator.propertyPath == "_orthographicSize"
+                // Fit To CastersはOrthographic時のみ表示する
+                if (iterator.propertyPath == "_fitToCasters"
                     && effectiveProjectionMode != null
                     && effectiveProjectionMode != ProjectionMode.Orthographic)
                 {
+                    continue;
+                }
+
+                if (iterator.propertyPath == "_orthographicSize")
+                {
+                    if (effectiveProjectionMode != null
+                        && effectiveProjectionMode != ProjectionMode.Orthographic)
+                    {
+                        continue;
+                    }
+
+                    // Fit To Casters有効時はOrthographic Sizeが使用されないためグレーアウトする
+                    // （マルチ選択で値が混在する場合は編集可能のままにする）
+                    bool fitEnabled = _fitToCasters.boolValue && !_fitToCasters.hasMultipleDifferentValues;
+                    using (new EditorGUI.DisabledScope(fitEnabled))
+                    {
+                        EditorGUILayout.PropertyField(iterator);
+                    }
                     continue;
                 }
 

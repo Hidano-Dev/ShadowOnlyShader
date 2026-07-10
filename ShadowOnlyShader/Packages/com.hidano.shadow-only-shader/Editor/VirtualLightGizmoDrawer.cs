@@ -80,7 +80,18 @@ namespace ShadowOnlyShader.Editor
             }
             else if (projMode == ProjectionMode.Orthographic)
             {
-                DrawOrthographicGizmo(orthoSize, near, far);
+                if (virtualLight.FitToCasters && TryGetFittedWindow(virtualLight, out Rect window))
+                {
+                    // Fitの投影ウィンドウはライト自身のTransform基準で算出される
+                    // （Play中はSourceLightと同期済みのため一致する）
+                    Gizmos.matrix = Matrix4x4.TRS(
+                        virtualLight.transform.position, virtualLight.transform.rotation, Vector3.one);
+                    DrawOffCenterOrthographicGizmo(window, near, far);
+                }
+                else
+                {
+                    DrawOrthographicGizmo(orthoSize, near, far);
+                }
             }
             else
             {
@@ -88,6 +99,39 @@ namespace ShadowOnlyShader.Editor
             }
 
             Gizmos.matrix = oldMatrix;
+        }
+
+        /// <summary>
+        /// Fit To Castersで算出された投影ウィンドウを取得する。
+        /// Editモードでは行列がLateUpdateで更新されないため、ここで明示的に再計算する。
+        /// </summary>
+        private static bool TryGetFittedWindow(VirtualLight light, out Rect window)
+        {
+            light.UpdateMatrices();
+            return light.TryGetFittedOrthoWindow(out window);
+        }
+
+        private static void DrawOffCenterOrthographicGizmo(Rect window, float near, float far)
+        {
+            Vector2 center = window.center;
+            float halfWidth = window.width * 0.5f;
+            float halfHeight = window.height * 0.5f;
+
+            DrawWireRect(new Vector3(center.x, center.y, near), halfWidth, halfHeight);
+            DrawWireRect(new Vector3(center.x, center.y, far), halfWidth, halfHeight);
+
+            Gizmos.DrawLine(
+                new Vector3(center.x - halfWidth, center.y - halfHeight, near),
+                new Vector3(center.x - halfWidth, center.y - halfHeight, far));
+            Gizmos.DrawLine(
+                new Vector3(center.x + halfWidth, center.y - halfHeight, near),
+                new Vector3(center.x + halfWidth, center.y - halfHeight, far));
+            Gizmos.DrawLine(
+                new Vector3(center.x + halfWidth, center.y + halfHeight, near),
+                new Vector3(center.x + halfWidth, center.y + halfHeight, far));
+            Gizmos.DrawLine(
+                new Vector3(center.x - halfWidth, center.y + halfHeight, near),
+                new Vector3(center.x - halfWidth, center.y + halfHeight, far));
         }
 
         private static void DrawOrthographicGizmo(float size, float near, float far)
