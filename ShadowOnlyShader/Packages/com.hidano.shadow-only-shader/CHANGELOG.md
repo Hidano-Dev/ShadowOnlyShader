@@ -5,6 +5,15 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.7.1] - 2026-07-10
+
+### 修正
+
+- `.meta` ファイルの不正な GUID を修正（14 個をランダム値で再生成）
+  - 初期作成分の GUID が連番ローテーションパターン（`a1b2c3d4e5f6...` の 1 文字シフト系列）で生成されており、`Editor.meta` は桁余りの 33 文字となって「GUID を抽出できない / アセットが無視される」警告が発生していた。連番パターンは他プロジェクトとの GUID 衝突リスクもあるため全廃
+  - シーン（SampleScene / Samples~ のサンプルシーン）と URP Renderer アセットのスクリプト参照も同じマッピングで一括更新済み
+  - **注意**: 0.7.0 を利用中のプロジェクトが 0.7.1 に更新すると、シーンに配置済みの本パッケージのコンポーネント（`ShadowOnlyManager` / `VirtualLight` / `ShadowOnlyRendererFeature` など）の参照が GUID 変更により Missing になります。該当コンポーネントの再アタッチと Renderer Feature の再追加が必要です
+
 ## [0.7.0] - 2026-07-10
 
 ### 追加
