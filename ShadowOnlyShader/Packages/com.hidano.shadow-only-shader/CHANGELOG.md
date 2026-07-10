@@ -5,10 +5,18 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
-## [0.8.0] - 2026-07-10
+## [0.7.0] - 2026-07-10
 
 ### 追加
 
+- ポイントライト（全方向）対応: `ProjectionMode.Point` を追加
+  - FOV 90° の透視投影 6 面（±X/±Y/±Z、ワールド軸基準）で全方向に影を投影する。従来は Point ライトが単一の Perspective 投影（デフォルト FOV 60°、正面方向のみ）で近似されており、視錐台に入ったキャスターしか影が出なかった
+  - 面の向きはワールド軸固定のため、光源の Transform を回転させても影は変化しない（ポイントライトとして物理的に正しい挙動）
+  - `SourceLight` に Point タイプの Light を設定すると `ProjectionMode.Point` に自動同期し、`range` が Far Clip Plane に反映される
+  - Point モードの光源は深度 Texture2DArray を 6 スライス消費する（同時描画上限 32 スライスのため、Point ライトは最大 5 個 + 通常光源 2 個など）。残りスライスに収まらない光源は丸ごとスキップされ、後続の小さい光源は描画される
+  - `IVirtualLight` に `SliceCount` プロパティと `GetSliceViewMatrix(int)` メソッドを追加
+  - Inspector: Point モード時は FOV / Orthographic Size を非表示にし、6 スライス消費の注記を表示。Scene ビューの Gizmo は Near/Far 範囲をワイヤー球で表示
+  - 診断: キャスター・床面の投影範囲判定を 6 面フラスタムに対応し、上限超過警告をスライス数ベースに変更
 - 接地ダークニング（コンタクト・ダークニング）を追加
   - キャスターと受影面の距離が近い部分（足元など）の影を濃くし、AO のような設置感を影パイプライン内で表現する
   - VirtualLight に `Contact Darkening Strength`（ベースの Shadow Alpha に上乗せする倍率、0 で無効）と `Contact Darkening Range`（Near〜Far 間を 0〜1 とした深度差での効果範囲）を追加。Inspector では Effects フォールドアウト内に表示され、Range は Strength > 0 のときのみ表示される
@@ -24,19 +32,6 @@
   - `IVirtualLight` に実効ルートを返す読み取り専用プロパティ `EffectiveCasterRoot` を追加、`IShadowOnlyManager` に `DefaultCasterRoot` を追加
   - Manager 側の `Default Caster Root` を実行中に差し替えた場合も、次フレームの収集で自動的に反映される（VirtualLight 側への明示的な通知は不要）
   - Inspector: VirtualLight の Caster Root が未設定のとき、実際に使用される Manager の Default Caster Root を情報表示。診断のキャスター未設定エラーは共通・個別の両方を案内するメッセージに変更
-
-## [0.7.0] - 2026-07-10
-
-### 追加
-
-- ポイントライト（全方向）対応: `ProjectionMode.Point` を追加
-  - FOV 90° の透視投影 6 面（±X/±Y/±Z、ワールド軸基準）で全方向に影を投影する。従来は Point ライトが単一の Perspective 投影（デフォルト FOV 60°、正面方向のみ）で近似されており、視錐台に入ったキャスターしか影が出なかった
-  - 面の向きはワールド軸固定のため、光源の Transform を回転させても影は変化しない（ポイントライトとして物理的に正しい挙動）
-  - `SourceLight` に Point タイプの Light を設定すると `ProjectionMode.Point` に自動同期し、`range` が Far Clip Plane に反映される
-  - Point モードの光源は深度 Texture2DArray を 6 スライス消費する（同時描画上限 32 スライスのため、Point ライトは最大 5 個 + 通常光源 2 個など）。残りスライスに収まらない光源は丸ごとスキップされ、後続の小さい光源は描画される
-  - `IVirtualLight` に `SliceCount` プロパティと `GetSliceViewMatrix(int)` メソッドを追加
-  - Inspector: Point モード時は FOV / Orthographic Size を非表示にし、6 スライス消費の注記を表示。Scene ビューの Gizmo は Near/Far 範囲をワイヤー球で表示
-  - 診断: キャスター・床面の投影範囲判定を 6 面フラスタムに対応し、上限超過警告をスライス数ベースに変更
 
 ## [0.6.0] - 2026-07-09
 
