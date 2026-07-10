@@ -1,59 +1,72 @@
 # HANDOVER
 
-対象: `Packages/com.hidano.shadow-only-shader`（Unity 6.3 / URP 17・RenderGraph）
+対象: `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader`（Unity 6 / URP 17・RenderGraph）
 
 ## ◯ 今回やったこと
 
-- **診断機能の新規実装（本セッションの主成果 / v0.5.1）**: 「影が表示されない」原因を自動検出し、ShadowOnlyManager の Inspector 上部に HelpBox 一覧表示する機能を追加。
-  - 新規 `Editor/ShadowOnlyDiagnostics.cs`: 診断ロジック本体（26 項目、Error/Warning/Info の 3 段階）。
-  - `Editor/ShadowOnlyManagerEditor.cs`: Inspector 最上部に「診断」折りたたみセクションを追加。約 2 秒間隔で自動更新＋「再診断」ボタン。
-  - 検出項目の分類: パイプライン系（URP 未使用 / Feature 未登録・無効 / **Quality 側 URP アセット差し替え漏れ**）、環境系（シェーダー欠落・Texture2DArray 非対応等）、Manager 系（非 Play / 無効 / 複数 / BlendMultiplier=0）、VirtualLight 系（光源なし / CasterRoot 未設定 / **キャスターがフラスタム外** / ShadowAlpha=0 / DepthBias 過大 / 解像度 4096 以上）、床面系（未登録 / 自己投影 / フラスタム外 / Play 中マテリアル上書き）。
-- CHANGELOG に 0.5.1 エントリ追加、README にトラブルシューティング節追加。
-- `.meta` はランダム GUID（`f605758f50c248d8b556e713d28b0fdc`）で作成。
-- コンパイル検証: 生成済み csproj に新ファイルを追記して `dotnet build` → 0 エラー / 0 警告。
+- **「影が縞々になる」問題の原因調査**（調査のみ。コード変更なし）。
+- スクリーンショットの画像解析（拡大・ローパス・彩度/R-B マップ）とコードリーディングで仮説を4つ検証:
+  1. シャドウアクネ（床がキャスター混入）→ 棄却（CasterRoot はキャラのみ）
+  2. ブラー疎カーネルのゴースト（Blur Radius 起因）→ 機序は正しいが支配要因の特定が誤り
+  3. Z ファイティング（キャッチャーと可視床の同一平面）→ 棄却（キャッチャーは +0.01 済み）
+  4. 色収差の離散5タップ → 棄却（CA は全灯 0）
+- **原因確定（ユーザー実験による）**: `Orthographic Size = 40`（投影範囲 80m×80m）が原因。5 に下げたら縞消滅。
+  - 機序: テクセル実寸 = OrthoSize×2 ÷ 解像度。ブラーのサンプル間隔は「Blur Radius **テクセル**」なので、テクセルが数 cm になると二値影のコピーが分離して等間隔の縞になる（疎カーネルゴースト。支配要因はテクセル実寸）。
+  - ユーザーが Size 40 にしていた理由: **ライトの角度によってキャスターが投影範囲から外れ影が途切れる**ため。
+- 解決方針を合意: **Fit To Casters（投影範囲のキャスター自動追従）を実装する**（次セッションの作業）。
 
 ## ◯ 決定事項
 
-- 診断は **Editor 専用**（`Editor/` アセンブリ内）。ランタイム API は追加しない。表示先は ShadowOnlyManager のカスタム Inspector。
-- Renderer Feature 登録確認は URP アセット内部フィールド `m_RendererDataList` を**リフレクション**で参照。取得失敗時（URP バージョン差異）は誤検知回避のため該当チェックのみ静かにスキップ。
-- FloorDisplay シェーダー欠落の深刻度は条件付き: BlurResolutionScale < 1.0 なら Error、1.0 なら Warning。
-- フラスタム判定は `GeometryUtility.CalculateFrustumPlanes(vl.ProjectionMatrix * vl.ViewMatrix)` + `TestPlanesAABB`。Edit モードでは行列未更新のため診断側で `vl.UpdateMatrices()` を明示呼び出し（非シリアライズフィールドのみ変更で無害）。
-- 診断結果は Error → Warning → Info の安定ソート（同一深刻度内は検出順維持）。
-- バージョンは **0.5.1**（ユーザーが 0.6.0 から変更。author も Hidano に変更済み）。CHANGELOG 見出しも 0.5.1 に合わせた。
+- **Fit To Casters を VirtualLight にオプトインで実装**（既存の手動 OrthoSize 運用はデフォルト維持）。
+- 実装方式:
+  1. 毎フレームの行列更新時（LateUpdate 系）に `CasterRenderers` の合成 `Bounds` をライト空間へ変換
+  2. XY 範囲を覆う**オフセンター正射影**（`Matrix4x4.Ortho(l, r, b, t, near, far)`）を生成。マージン +10% 程度 + ブラーカーネル分の余白
+  3. **テクセルスナップ**（投影ウィンドウ原点を 1 テクセル単位に量子化）で shadow swimming を防止
+- シャドウマップはキャスターの UV 範囲だけ覆えばよい（受影点はライト空間で同じ UV に射影されるため、レシーバー範囲を含める必要はない）。
 
 ## ◯ 捨てた選択肢と理由
 
-- **診断の毎 Repaint 実行** → 不採用。FindObjectsByType・GetComponentsInChildren・リフレクションが毎描画走るのは無駄。2 秒スロットル＋手動「再診断」で十分。
-- **ランタイム（ビルド内）診断 API** → 不採用。トラブルシュートは Editor 上で完結する想定。要望が出たら Runtime 移設を検討。
-- **カメラごとの Renderer 選択（rendererIndex）まで追跡** → 不採用。UniversalAdditionalCameraData の内部フィールド参照が必要で複雑化。URP アセットが参照する全 Renderer を横断チェックする方式で実用上十分。
-- **ShadowColor（白影が白床で見えない等）の検出** → 不採用。誤検知が多く信頼できる判定基準がない。
-- **診断用の Editor テスト追加** → 今回は見送り。シーン構築依存が強く費用対効果が低い。
+- **アクネ対策（Offset / NormalBias 実装 / bias 調整）を今回の修正とする** → 縞の原因ではなかった。ただし下記「学び」の別件バグ・改善は別途対応の価値あり。
+- **ブラーを screen-space 分離ガウシアン（Resolve RT 上）に作り直す** → 根本対策としては有効だが工事が大きい。Fit To Casters でテクセル実寸が小さく保たれれば縞は実用上解決するため見送り。
+- **Poisson disk + IGN ジッタ化** → 同上。Fit To Casters 後もゴーストが残る場合の次の手として保留。
+- **実効 blurRadius のクランプ** → 対症療法で見た目のボケ幅も制限されるため不採用。
 
 ## ◯ ハマりどころ
 
-- `dotnet build` が最初に失敗したのは**単に生成済み csproj に新ファイルが未登録**だったため（Unity の csproj はファイル明示列挙）。csproj へ手動追記して検証した。csproj は git 管理外なので追記はそのままで問題なし。
-- Grep 表示で hlsl の 535 行目コメントが `\` に見えたが、実ファイルは `//` で正常（表示アーティファクト）。シェーダーに問題はない。
-- `ProjectionMode` はプロパティ名と型名が同名だが、静的メソッド内の `ProjectionMode.Orthographic` は型として解決されるため問題なし。
+- スクリーンショットのシーンはリポジトリの SampleScene と**別物**（利用側プロジェクト、キャラ2体）。コミット済みシーンの値（OrthoSize 5, CA 0.05 等）から実環境を推定すると誤る。実際の値はユーザーに聞くこと。
+- 縞の見た目（世界空間の平行帯・ブラー品質で幅と濃さだけ変化・Blur Radius 無反応）から仮説を絞ったが、最終確定はユーザーの実機実験だった。リモート推理より「切り分け実験の依頼」を早めに出すのが効率的。
 
 ## ◯ 学び
 
-- Editor アセンブリは `InternalsVisibleTo("com.hidano.shadow-only-shader.Editor")` 済みのため、`ShadowOnlyManager.MaxVirtualLights` や `VirtualLight.ResolveTextureResolution()` に直接アクセスできる。
-- `GraphicsSettings.currentRenderPipeline` は Quality 側オーバーライドを反映した「実際に使われるアセット」を返す。`QualitySettings.renderPipeline` と `GraphicsSettings.defaultRenderPipeline` の比較で「Graphics だけ直して Quality が古い」落とし穴を機械検出できる（過去セッションで影が出なかった主因）。
-- Unity 生成 csproj + `dotnet build` で Unity を起動せずに構文・型チェックが可能（新規ファイルは csproj へ手動追記が必要）。
+調査中に見つけた**別件の問題**（今回の縞とは無関係だが修正価値あり）:
+
+- **NormalBias が未実装**: `VirtualLight._normalBias` はシリアライズ・Inspector 表示されるが、`ShadowOnlyManager.UpdateMaterialProperties()` が転送せず、HLSL にも処理がない。完全に無反応。実装するか削除すべき。
+- **Perspective 投影の DepthBias が 1/w² スケール**（`ShadowOnlyFloorCommon.hlsl:302`）: 実効値が距離の2乗で減衰し、ユーザー設定がほぼ効かない。効く値まで上げると診断が「過大」警告を出す矛盾。
+- 深度テクスチャ 8192 × 灯数スライスは D24 で数百 MB 級。`EnsureDepthArrayTexture` の作成失敗→解像度半減フォールバックが黙って効いている可能性がある（Console 警告確認）。
+- ブラーの構造: 見た目のボケ幅 = 2R × blurRadius テクセル（R: Low=2/Mid=4/High=6）、ゴースト周期 = blurRadius × テクセル実寸。望むボケ幅 W に対し縞周期は常に W/(2R)。
+- 色収差はブラー有効時 5 タップ・無効時 11 タップの離散サンプリング（強度を上げると同種の縞が出る潜在リスク）。
 
 ## ◯ 次にやること
 
-1. **【最優先・要ユーザー確認】Unity Editor 上での診断機能の動作確認**。HelpBox 表示、実際のエラーシーン（Feature 未登録・CasterRoot 未設定等）での検出、Play 中の挙動。未検証なのはここだけ。
-2. **【残課題・性能】** 深度 RT が 8192×8192 になる問題の設定見直し（診断が 4096 以上で警告を出すようにはなったが、根本のデフォルト値是正は未対応）。`VirtualLight.TextureResolution` / URP Main Light Shadow Resolution 由来。
-3. **【補足】** package.json は `unity: 6000.3` 想定だが実行環境は 6000.0.36f1。動作はしているが整合は要検討。
-4. push 後、実行プロジェクト側で再取得（Package Manager Update / packages-lock.json 該当エントリ削除）。
-5. 変更は未コミット。コミット時は新規 2 ファイル（`ShadowOnlyDiagnostics.cs` + `.meta`）を含めること。
+1. **【最優先】Fit To Casters の実装**（ユーザー合意済み）:
+   - `VirtualLight` に `_fitToCasters`（bool、デフォルト false）追加
+   - 行列計算（`CalculateProjectionMatrix` / `UpdateMatrices` 周辺）でキャスター Bounds →ライト空間 AABB →オフセンター Ortho + マージン + テクセルスナップ
+   - Orthographic モードのみ対象（Perspective/Point は対象外でよいか実装時に判断）
+   - `VirtualLightEditor` に UI 追加（Fit 有効時は OrthoSize をグレーアウト等）
+   - Edit モード（診断が `UpdateMatrices()` を呼ぶ経路）でも破綻しないこと
+   - テスト追加（`Tests/Editor/VirtualLightMatrixTests.cs` 周辺に）
+2. 【推奨・小】診断に「OrthoSize 過大（テクセル実寸が閾値超え）」警告を追加 — 今回の問題の再発防止。テクセル実寸 = Size×2÷解像度 で判定
+3. 【任意】NormalBias 未実装の解消（実装 or フィールド削除）、Perspective bias 1/w² の見直し
+4. CHANGELOG / README 更新、バージョン更新はユーザーに確認
 
 ## ◯ 関連ファイル
 
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Editor/ShadowOnlyDiagnostics.cs`（新規・診断ロジック本体）
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Editor/ShadowOnlyDiagnostics.cs.meta`（新規）
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Editor/ShadowOnlyManagerEditor.cs`（診断セクション UI 追加）
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/CHANGELOG.md`（0.5.1 エントリ）
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/README.md`（トラブルシューティング節）
-- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/package.json`（0.5.1）
+調査で読んだ主要ファイル（今回変更なし）:
+
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/VirtualLight.cs`（行列計算・OrthoSize・実装対象の中心）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/ShadowOnlyManager.cs`（パラメータ転送 `UpdateMaterialProperties` / 深度 Tex2DArray 管理）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/ShadowOnlyRenderPass.cs`（深度パス、スライスごと描画）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/ShadowOnlyShadowResolvePass.cs`（低解像度 Resolve）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/Shaders/ShadowOnlyFloorCommon.hlsl`（影判定・ブラー・CA。縞の機序はここのブラーループ）
+- `ShadowOnlyShader/Packages/com.hidano.shadow-only-shader/Runtime/Shaders/ShadowOnlyFloor.shader` / `ShadowOnlyFloorDisplay.shader` / `ShadowOnlyDepth.shader`
+- `ShadowOnlyShader/Assets/Scenes/SampleScene.unity`（サンプルシーン。実環境とは別物な点に注意）
