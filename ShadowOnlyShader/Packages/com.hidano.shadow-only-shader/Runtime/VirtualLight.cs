@@ -481,12 +481,12 @@ namespace ShadowOnlyShader
         public Matrix4x4 ViewProjectionMatrix => _viewProjectionMatrix;
 
         /// <inheritdoc />
-        public int SliceCount => _projectionMode == ProjectionMode.Point ? PointFaceCount : 1;
+        public int SliceCount => EffectiveProjectionMode == ProjectionMode.Point ? PointFaceCount : 1;
 
         /// <inheritdoc />
         public Matrix4x4 GetSliceViewMatrix(int sliceIndex)
         {
-            if (_projectionMode == ProjectionMode.Point)
+            if (EffectiveProjectionMode == ProjectionMode.Point)
             {
                 sliceIndex = Mathf.Clamp(sliceIndex, 0, PointFaceCount - 1);
                 return _pointFaceViewMatrices[sliceIndex];
@@ -522,9 +522,9 @@ namespace ShadowOnlyShader
             _projectionMatrix = CalculateProjectionMatrix();
             _viewProjectionMatrix = _projectionMatrix * _viewMatrix;
 
-            if (_projectionMode == ProjectionMode.Point)
+            if (EffectiveProjectionMode == ProjectionMode.Point)
             {
-                Vector3 position = transform.position;
+                Vector3 position = EffectiveLightPosition;
                 for (int face = 0; face < PointFaceCount; face++)
                 {
                     _pointFaceViewMatrices[face] = CalculateViewMatrix(position, PointFaceRotations[face]);
@@ -562,13 +562,13 @@ namespace ShadowOnlyShader
         #region Matrix Calculation
 
         /// <summary>
-        /// TransformからView行列を算出する。
+        /// 実効のライト位置・回転からView行列を算出する。
         /// カメラのView行列と同様に、ワールド空間からビュー空間への変換を行う。
+        /// Editモード同期プレビュー中はSourceLightのTransformが使用される。
         /// </summary>
         private Matrix4x4 CalculateViewMatrix()
         {
-            Transform t = transform;
-            return CalculateViewMatrix(t.position, t.rotation);
+            return CalculateViewMatrix(EffectiveLightPosition, EffectiveLightRotation);
         }
 
         /// <summary>
@@ -596,21 +596,22 @@ namespace ShadowOnlyShader
         private Matrix4x4 CalculateProjectionMatrix()
         {
             float near = _nearClipPlane;
-            float far = _farClipPlane;
+            float far = EffectiveFarClipPlane;
 
             _hasFittedOrthoWindow = false;
 
-            if (_projectionMode == ProjectionMode.Point)
+            ProjectionMode mode = EffectiveProjectionMode;
+            if (mode == ProjectionMode.Point)
             {
                 // Cube face projection: FOV 90° fixed, 1:1 aspect ratio.
                 // 全6面で同一のProjection行列を共有する
                 return Matrix4x4.Perspective(PointFaceFieldOfView, 1f, near, far);
             }
 
-            if (_projectionMode == ProjectionMode.Perspective)
+            if (mode == ProjectionMode.Perspective)
             {
                 // Perspective projection with 1:1 aspect ratio (square depth texture)
-                return Matrix4x4.Perspective(_fieldOfView, 1f, near, far);
+                return Matrix4x4.Perspective(EffectiveFieldOfView, 1f, near, far);
             }
             else
             {
@@ -762,6 +763,89 @@ namespace ShadowOnlyShader
         #region Source Light Sync
 
         /// <summary>
+        /// EditモードでSourceLightが設定されており、シリアライズ値を書き換えない
+        /// 同期プレビューを行う状態かどうか。
+        /// Play中の同期はLateUpdateでシリアライズ値へ直接適用されるため、常にfalseになる。
+        /// </summary>
+        private bool IsEditorSyncPreview
+        {
+            get
+            {
+#if UNITY_EDITOR
+                return !Application.isPlaying && _sourceLight != null;
+#else
+                return false;
+#endif
+            }
+        }
+
+        /// <summary>
+        /// 影計算に使用する実効のライト位置。
+        /// Editモード同期プレビュー中はSourceLightの位置、それ以外は自身のTransformの位置。
+        /// </summary>
+        internal Vector3 EffectiveLightPosition =>
+            IsEditorSyncPreview ? _sourceLight.transform.position : transform.position;
+
+        /// <summary>
+        /// 影計算に使用する実効のライト回転。
+        /// Editモード同期プレビュー中はSourceLightの回転、それ以外は自身のTransformの回転。
+        /// </summary>
+        internal Quaternion EffectiveLightRotation =>
+            IsEditorSyncPreview ? _sourceLight.transform.rotation : transform.rotation;
+
+        /// <summary>
+        /// 実効の投影モード。Editモード同期プレビュー中はSourceLightのタイプから導出する
+        /// （SyncFromSourceLightと同一の対応関係）。
+        /// </summary>
+        internal ProjectionMode EffectiveProjectionMode
+        {
+            get
+            {
+                if (IsEditorSyncPreview)
+                {
+                    switch (_sourceLight.type)
+                    {
+                        case LightType.Spot: return ProjectionMode.Perspective;
+                        case LightType.Directional: return ProjectionMode.Orthographic;
+                        case LightType.Point: return ProjectionMode.Point;
+                    }
+                }
+                return _projectionMode;
+            }
+        }
+
+        /// <summary>
+        /// 実効の視野角。Editモード同期プレビュー中のSpotライトはspotAngleを使用する。
+        /// </summary>
+        internal float EffectiveFieldOfView =>
+            (IsEditorSyncPreview && _sourceLight.type == LightType.Spot)
+                ? _sourceLight.spotAngle
+                : _fieldOfView;
+
+        /// <summary>
+        /// 実効のFar Clip Plane。Editモード同期プレビュー中のSpot/Pointライトはrangeを使用する
+        /// （Directionalにはrangeの概念がないため既存値を維持。SyncFromSourceLightと同一の規則）。
+        /// </summary>
+        internal float EffectiveFarClipPlane
+        {
+            get
+            {
+                if (IsEditorSyncPreview &&
+                    (_sourceLight.type == LightType.Spot || _sourceLight.type == LightType.Point))
+                {
+                    return Mathf.Max(_sourceLight.range, _nearClipPlane + 0.001f);
+                }
+                return _farClipPlane;
+            }
+        }
+
+        /// <summary>
+        /// 実効の影の濃さ。Editモード同期プレビュー中はSourceLightのshadowStrengthを使用する。
+        /// </summary>
+        internal float EffectiveShadowAlpha =>
+            IsEditorSyncPreview ? Mathf.Clamp01(_sourceLight.shadowStrength) : _shadowAlpha;
+
+        /// <summary>
         /// 現在のTransformと投影パラメータを保存する。
         /// SourceLightが設定される直前に呼び出す。
         /// </summary>
@@ -907,10 +991,11 @@ namespace ShadowOnlyShader
         private void LateUpdate()
         {
 #if UNITY_EDITOR
-            // Editモード（ExecuteAlways）ではSourceLight同期を行わない。
+            // Editモード（ExecuteAlways）ではSourceLightのシリアライズ値への同期を行わない。
             // 同期はTransformとシリアライズフィールドへ書き込むため、
             // 影を確認しているだけでシーンに差分が入ってしまう。
-            // Editモードでは行列更新のみ行ってプレビューを描画する
+            // 代わりにEffectiveXxxアクセサがSourceLightの値を非破壊で参照するため、
+            // 行列更新のみでSourceLight追従のプレビューが描画される
             if (!Application.isPlaying)
             {
                 UpdateMatrices();

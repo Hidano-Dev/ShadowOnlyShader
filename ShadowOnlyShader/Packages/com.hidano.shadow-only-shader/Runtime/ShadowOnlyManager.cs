@@ -616,7 +616,8 @@ namespace ShadowOnlyShader
                 var shadowColor = new Vector4(sc.r, sc.g, sc.b, sc.a);
                 Color caColor = vl.EffectiveChromaticAberrationColor;
                 var chromaticAberrationColor = new Vector4(caColor.r, caColor.g, caColor.b, caColor.a);
-                Vector3 pos = vl.transform.position;
+                // Editモード同期プレビュー中はSourceLightの位置を参照する
+                Vector3 pos = vl.EffectiveLightPosition;
                 var lightWorldPosition = new Vector4(pos.x, pos.y, pos.z, 1f);
 
                 // GL.GetGPUProjectionMatrixでプラットフォーム固有のProjection行列に変換し、
@@ -638,7 +639,7 @@ namespace ShadowOnlyShader
                     _lightVPMatrices[sliceIndex] = gpuProj * vl.GetSliceViewMatrix(face);
 
                     _shadowColors[sliceIndex] = shadowColor;
-                    _shadowAlphas[sliceIndex] = vl.ShadowAlpha;
+                    _shadowAlphas[sliceIndex] = vl.EffectiveShadowAlpha;
                     _depthBiases[sliceIndex] = vl.DepthBias;
                     _blurRadii[sliceIndex] = vl.BlurRadius;
                     _blurDistanceFactors[sliceIndex] = vl.BlurDistanceFactor;

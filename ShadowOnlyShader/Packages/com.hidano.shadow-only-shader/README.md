@@ -42,7 +42,7 @@ https://github.com/Hidano-Dev/ShadowOnlyShader.git?path=ShadowOnlyShader/Package
 
 Manager の Inspector から仮想光源 (VirtualLight) を追加します。子 GameObject として生成されるので、位置・回転を調整して影の方向を決めてください。
 
-> 影は **Edit モード中もプレビュー表示** されます。Play せずに光源の位置・回転を調整しながら配灯結果を確認できます（`Source Light` 同期のみ Play 中に反映されます）。
+> 影は **Edit モード中もプレビュー表示** されます。Play せずに光源の位置・回転を調整しながら配灯結果を確認できます。`Source Light` を設定した光源も、Edit モード中は Light の位置・パラメータに追従してプレビューされます。
 
 ### 5. キャスターを設定する
 

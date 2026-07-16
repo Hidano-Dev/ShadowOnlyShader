@@ -16,11 +16,16 @@ namespace ShadowOnlyShader.Editor
         {
             if (virtualLight == null) return;
 
-            // SourceLight設定時はSourceLightのTransformと投影パラメータで描画する
-            bool useLightTransform = virtualLight.SourceLight != null;
-            Transform drawTransform = useLightTransform
-                ? virtualLight.SourceLight.transform
-                : virtualLight.transform;
+            // 実効値（EffectiveXxx）で描画する。SourceLight設定時は
+            // Editモード同期プレビュー・Play中の同期後のどちらでもLightの状態と一致し、
+            // 実際の影の投影範囲とGizmoが常に対応する
+            Vector3 drawPosition = virtualLight.EffectiveLightPosition;
+            Quaternion drawRotation = virtualLight.EffectiveLightRotation;
+            ProjectionMode projMode = virtualLight.EffectiveProjectionMode;
+            float fov = virtualLight.EffectiveFieldOfView;
+            float orthoSize = virtualLight.OrthographicSize;
+            float near = virtualLight.NearClipPlane;
+            float far = virtualLight.EffectiveFarClipPlane;
 
             Color gizmoColor = (gizmoType & GizmoType.Selected) != 0
                 ? new Color(1f, 0.8f, 0f, 0.8f)
@@ -29,63 +34,21 @@ namespace ShadowOnlyShader.Editor
             Gizmos.color = gizmoColor;
 
             Matrix4x4 oldMatrix = Gizmos.matrix;
-            Gizmos.matrix = Matrix4x4.TRS(drawTransform.position, drawTransform.rotation, Vector3.one);
-
-            // SourceLight設定時はLightから投影パラメータを取得
-            ProjectionMode projMode;
-            float fov, orthoSize, near, far;
-
-            if (useLightTransform)
-            {
-                Light light = virtualLight.SourceLight;
-                near = virtualLight.NearClipPlane;
-
-                switch (light.type)
-                {
-                    case LightType.Spot:
-                        projMode = ProjectionMode.Perspective;
-                        fov = light.spotAngle;
-                        orthoSize = virtualLight.OrthographicSize;
-                        far = light.range;
-                        break;
-                    case LightType.Point:
-                        projMode = ProjectionMode.Point;
-                        fov = virtualLight.FieldOfView;
-                        orthoSize = virtualLight.OrthographicSize;
-                        far = light.range;
-                        break;
-                    default: // Directional
-                        projMode = ProjectionMode.Orthographic;
-                        fov = virtualLight.FieldOfView;
-                        orthoSize = virtualLight.OrthographicSize;
-                        far = virtualLight.FarClipPlane;
-                        break;
-                }
-            }
-            else
-            {
-                projMode = virtualLight.ProjectionMode;
-                fov = virtualLight.FieldOfView;
-                orthoSize = virtualLight.OrthographicSize;
-                near = virtualLight.NearClipPlane;
-                far = virtualLight.FarClipPlane;
-            }
+            Gizmos.matrix = Matrix4x4.TRS(drawPosition, drawRotation, Vector3.one);
 
             if (projMode == ProjectionMode.Point)
             {
                 // Pointモードの投影はワールド軸基準で回転に依存しないため、
                 // 回転を含まない行列で描画する
-                Gizmos.matrix = Matrix4x4.Translate(drawTransform.position);
+                Gizmos.matrix = Matrix4x4.Translate(drawPosition);
                 DrawPointGizmo(near, far);
             }
             else if (projMode == ProjectionMode.Orthographic)
             {
                 if (virtualLight.FitToCasters && TryGetFittedWindow(virtualLight, out Rect window))
                 {
-                    // Fitの投影ウィンドウはライト自身のTransform基準で算出される
-                    // （Play中はSourceLightと同期済みのため一致する）
-                    Gizmos.matrix = Matrix4x4.TRS(
-                        virtualLight.transform.position, virtualLight.transform.rotation, Vector3.one);
+                    // Fitの投影ウィンドウは実効View空間（Editモード同期プレビュー中は
+                    // SourceLight基準）で算出されるため、設定済みのGizmos.matrixと基準が一致する
                     DrawOffCenterOrthographicGizmo(window, near, far);
                 }
                 else
