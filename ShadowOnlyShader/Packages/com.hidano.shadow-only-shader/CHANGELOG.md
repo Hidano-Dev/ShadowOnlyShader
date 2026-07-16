@@ -5,7 +5,7 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
-## [0.9.0] - 2026-07-16
+## [0.8.0] - 2026-07-16
 
 ### 追加
 
@@ -16,14 +16,6 @@
   - RendererFeature が Preview カメラ（マテリアル / Inspector プレビュー）と Reflection Probe カメラで影パスをスキップするようになった。特に Reflection Probe は従来 Resolve RT をプローブ解像度で上書きする問題があったため修正を兼ねる
   - Hierarchy の目玉マーク（Scene Visibility）に影が追従するようになった。目玉マークで非表示にしたキャスターは Scene ビューの影からも除外され、VirtualLight 自体を非表示にするとその光源の影が Scene ビューから消える。Scene Visibility は Scene ビュー専用の機能のため、Game ビューの影には影響しない
 
-### 既知の制限
-
-- 床 Renderer が Prefab インスタンスの場合、Edit モード中に「Apply to Prefab」を実行すると自動生成マテリアルの Missing 参照が Prefab アセットに書き込まれる可能性があります。床のマテリアルを Prefab に Apply する際は一度 Manager を無効化してください
-
-## [0.8.0] - 2026-07-10
-
-### 追加
-
 - Fit To Casters（投影範囲のキャスター自動追従）を追加
   - VirtualLight に `Fit To Casters`（デフォルト無効）を追加。有効にすると Orthographic モードの投影範囲が、キャスター全体の合成 Bounds を覆うオフセンター正射影として毎フレーム自動算出される
   - ライトの角度を変えてもキャスターが投影範囲から外れず、投影範囲が必要最小限に保たれるためテクセル密度が高くなる。広い `Orthographic Size`（テクセル実寸の粗さ）に起因するブラーの縞状ゴーストの実用的な対策になる
@@ -33,6 +25,10 @@
   - キャスターが 1 つも存在しない場合は従来どおり `Orthographic Size` にフォールバックする。Perspective / Point モードでは無視される
   - `IVirtualLight` に `FitToCasters` プロパティを追加
   - Inspector: `Fit To Casters` は Orthographic 時のみ表示され、有効時は `Orthographic Size` をグレーアウトする。Scene ビューの Gizmo はフィット後の実際の投影範囲を表示する
+
+### 既知の制限
+
+- 床 Renderer が Prefab インスタンスの場合、Edit モード中に「Apply to Prefab」を実行すると自動生成マテリアルの Missing 参照が Prefab アセットに書き込まれる可能性があります。床のマテリアルを Prefab に Apply する際は一度 Manager を無効化してください
 
 ## [0.7.1] - 2026-07-10
 
