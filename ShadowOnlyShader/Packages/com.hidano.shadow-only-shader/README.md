@@ -34,7 +34,7 @@ https://github.com/Hidano-Dev/ShadowOnlyShader.git?path=ShadowOnlyShader/Package
 
 ### 3. 床面を登録する
 
-影を受け取る透明な床メッシュの Renderer を Manager の **Floor Renderers** に追加します。床面のマテリアルは実行時に自動で割り当てられます（Manager の Inspector にある **床面を自動生成** ボタンでも作成できます）。
+影を受け取る透明な床メッシュの Renderer を Manager の **Floor Renderers** に追加します。床面のマテリアルは自動で割り当てられます（Manager の Inspector にある **床面を自動生成** ボタンでも作成できます）。自動割り当てされたマテリアルはシーン保存時に元のマテリアルへ自動復元されるため、シーンファイルは変更されません。
 
 > 仮想光源を配置する前に床面を先に登録しておくと、次のステップで光源を動かしたときに影が床へ落ちる様子を確認しながら調整できます。
 
@@ -42,7 +42,7 @@ https://github.com/Hidano-Dev/ShadowOnlyShader.git?path=ShadowOnlyShader/Package
 
 Manager の Inspector から仮想光源 (VirtualLight) を追加します。子 GameObject として生成されるので、位置・回転を調整して影の方向を決めてください。
 
-> 影の描画は **Play 中** に更新されます。配灯結果を確認するときは Play モードに入ってください。
+> 影は **Edit モード中もプレビュー表示** されます。Play せずに光源の位置・回転を調整しながら配灯結果を確認できます（`Source Light` 同期のみ Play 中に反映されます）。
 
 ### 5. キャスターを設定する
 
@@ -102,7 +102,6 @@ Manager の Inspector から仮想光源 (VirtualLight) を追加します。子
 影が上手く表示されない場合は、ShadowOnlyManager の Inspector 上部にある **「診断」** セクションを確認してください。以下のような原因を自動検出し、エラー・警告・情報の 3 段階で表示します。
 
 - Renderer Feature の未登録・無効化（Quality 設定側 URP アセットの差し替え漏れを含む）
-- Play モードでないため影が更新されない
 - 仮想光源・床面 Renderer の未設定や非アクティブ、上限（32 スライス）超過
 - 床面が光源の投影範囲（フラスタム）の外にある
 - `Blend Multiplier` が 0 で影が透明になっている

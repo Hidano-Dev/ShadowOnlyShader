@@ -51,11 +51,11 @@ namespace ShadowOnlyShader.Editor
     /// - パイプライン系: URP未使用 / Renderer FeatureがRendererに未登録・無効 /
     ///   Quality設定側URPアセットの差し替え漏れ（Graphics設定のみ変更の落とし穴）
     /// - 環境系: 必須シェーダーの欠落・非サポート / Texture2DArray・深度フォーマット非対応
-    /// - Manager系: 非Playモード / Manager無効 / 複数Manager / BlendMultiplier=0
+    /// - Manager系: Manager無効 / 複数Manager / BlendMultiplier=0
     /// - VirtualLight系: 光源なし / 全て非アクティブ / 上限超過 / Manager配下にない光源 /
     ///   個別問題の集約 / 共有深度テクスチャの解像度過大（設定の出どころを明示）
     /// - 床面系: 未登録 / null要素 / 全て非表示 / 床がキャスターに含まれる（自己投影） /
-    ///   床がどの光源の投影範囲にも入っていない / Play中のマテリアル上書き
+    ///   床がどの光源の投影範囲にも入っていない / マテリアル上書き
     /// </summary>
     internal static class ShadowOnlyDiagnostics
     {
@@ -381,17 +381,10 @@ namespace ShadowOnlyShader.Editor
         #region Manager状態チェック
 
         /// <summary>
-        /// Manager自体の状態（Playモード・有効状態・重複・グローバルパラメータ）を確認する。
+        /// Manager自体の状態（有効状態・重複・グローバルパラメータ）を確認する。
         /// </summary>
         private static void CheckManagerState(ShadowOnlyManager manager, List<DiagnosticIssue> issues)
         {
-            if (!Application.isPlaying)
-            {
-                Add(issues, DiagnosticSeverity.Info,
-                    "影の描画・更新はPlayモード中のみ行われます。" +
-                    "Editモードでは本ツールの影は表示されません（URP標準の影とは別物です）。");
-            }
-
             if (!manager.isActiveAndEnabled)
             {
                 Add(issues, DiagnosticSeverity.Error,
@@ -860,13 +853,15 @@ namespace ShadowOnlyShader.Editor
         }
 
         /// <summary>
-        /// Play中に床面のマテリアルが本パッケージ管理外のものに上書きされていないかを確認する。
+        /// 床面のマテリアルが本パッケージ管理外のものに上書きされていないかを確認する。
+        /// ExecuteAlwaysによりEditモードでもマテリアルが割り当てられるため、
+        /// Play/Editの両モードで確認する。
         /// </summary>
         private static void CheckFloorMaterialOverride(
             ShadowOnlyManager manager, List<Renderer> activeFloors, List<DiagnosticIssue> issues)
         {
-            // Managerが動作している（=マテリアル割り当て済みの）Play中のみ意味がある
-            if (!Application.isPlaying || !manager.isActiveAndEnabled || manager.FloorMaterial == null)
+            // Managerが動作している（=マテリアル割り当て済みの）場合のみ意味がある
+            if (!manager.isActiveAndEnabled || manager.FloorMaterial == null)
             {
                 return;
             }

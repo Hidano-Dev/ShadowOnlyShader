@@ -10,7 +10,11 @@ namespace ShadowOnlyShader
     /// 仮想光源・床面Renderer・グローバルパラメータを一元管理する。
     /// 深度テクスチャはTexture2DArrayとして一元管理し、全VirtualLightで共有する。
     /// IShadowOnlyManagerインターフェースを実装する。
+    /// ExecuteAlwaysによりEditモードでも動作し、影のプレビューを表示する。
+    /// 床Rendererへ割り当てる自動生成マテリアルはシーン保存前に元のマテリアルへ
+    /// 復元されるため、プレビューによってシーンファイルが変更されることはない。
     /// </summary>
+    [ExecuteAlways]
     public class ShadowOnlyManager : MonoBehaviour, IShadowOnlyManager
     {
         /// <summary>
@@ -114,6 +118,15 @@ namespace ShadowOnlyShader
         /// 複数Manager警告の重複表示を防ぐフラグ。
         /// </summary>
         private bool _warnedMultipleManagers;
+
+        /// <summary>
+        /// 床Rendererへ自動生成マテリアルを割り当てる際に退避した元のsharedMaterial。
+        /// 自動生成マテリアルはHideFlags.DontSaveのため、Editモードで割り当てたまま
+        /// シーンが保存されると参照がMissingとして書き出され、元のマテリアル参照が失われる。
+        /// シーン保存直前・コンポーネント無効化時にこの内容へ復元することでそれを防ぐ。
+        /// </summary>
+        private readonly Dictionary<Renderer, Material> _originalFloorMaterials =
+            new Dictionary<Renderer, Material>();
 
         /// <summary>
         /// 現在描画対象になっている深度スライスの総数（ResolvePassから参照される）。
@@ -247,6 +260,17 @@ namespace ShadowOnlyShader
             if (renderer == null) return;
 
             _floorRenderers.Remove(renderer);
+
+            // 登録解除した床は管理対象外になるため、退避済みの元マテリアルへ戻す
+            if (_originalFloorMaterials.TryGetValue(renderer, out var original))
+            {
+                var current = renderer.sharedMaterial;
+                if (current == _floorMaterial || current == _floorMaterialDisplay)
+                {
+                    renderer.sharedMaterial = original;
+                }
+                _originalFloorMaterials.Remove(renderer);
+            }
         }
 
         #endregion
@@ -736,10 +760,46 @@ namespace ShadowOnlyShader
                     continue;
                 }
 
+                // 自動生成マテリアル以外が割り当てられている場合は元マテリアルとして退避する
+                // （シーン保存時・無効化時にRestoreOriginalFloorMaterialsで復元される）
+                var current = renderer.sharedMaterial;
+                if (current != _floorMaterial && current != _floorMaterialDisplay)
+                {
+                    _originalFloorMaterials[renderer] = current;
+                }
+
                 renderer.sharedMaterial = materialToAssign;
             }
 
             _floorMaterialDirty = false;
+        }
+
+        /// <summary>
+        /// 床Rendererに割り当てた自動生成マテリアルを退避済みの元マテリアルへ戻す。
+        /// シーン保存直前・コンポーネント無効化/破棄時に呼び出され、
+        /// DontSaveマテリアルへの参照がシーンやPrefabに永続化されるのを防ぐ。
+        /// 復元後はdirtyフラグを立て、次のAssignFloorMaterialで再割り当てされるようにする。
+        /// </summary>
+        private void RestoreOriginalFloorMaterials()
+        {
+            foreach (var pair in _originalFloorMaterials)
+            {
+                var renderer = pair.Key;
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                // ユーザーが手動で別のマテリアルに差し替えている場合は上書きしない
+                var current = renderer.sharedMaterial;
+                if (current == _floorMaterial || current == _floorMaterialDisplay)
+                {
+                    renderer.sharedMaterial = pair.Value;
+                }
+            }
+
+            _originalFloorMaterials.Clear();
+            _floorMaterialDirty = true;
         }
 
         #endregion
@@ -805,6 +865,15 @@ namespace ShadowOnlyShader
 
         private void OnEnable()
         {
+#if UNITY_EDITOR
+            // シーン/Prefab保存の前後で自動生成マテリアルの退避・再割り当てを行う
+            // （DontSaveマテリアル参照がシーンやPrefabに書き出されるのを防ぐ）
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaving += OnSceneSaving;
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaved += OnSceneSaved;
+            UnityEditor.SceneManagement.PrefabStage.prefabSaving += OnPrefabSaving;
+            UnityEditor.SceneManagement.PrefabStage.prefabSaved += OnPrefabSaved;
+#endif
+
             // リソース生成
             CreateFloorMaterial();
 
@@ -820,15 +889,70 @@ namespace ShadowOnlyShader
 
         private void OnDisable()
         {
-            // リソース破棄
+#if UNITY_EDITOR
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaving -= OnSceneSaving;
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaved -= OnSceneSaved;
+            UnityEditor.SceneManagement.PrefabStage.prefabSaving -= OnPrefabSaving;
+            UnityEditor.SceneManagement.PrefabStage.prefabSaved -= OnPrefabSaved;
+#endif
+
+            // 床Rendererを元のマテリアルに戻してからリソースを破棄する
+            RestoreOriginalFloorMaterials();
             DestroyResources();
         }
 
         private void OnDestroy()
         {
             // リソース破棄（OnDisableが呼ばれない場合の安全策）
+            RestoreOriginalFloorMaterials();
             DestroyResources();
         }
+
+#if UNITY_EDITOR
+        /// <summary>
+        /// シーン保存直前に床Rendererを元のマテリアルへ復元する。
+        /// DontSaveの自動生成マテリアル参照がMissingとしてシーンに保存され、
+        /// 元のマテリアル参照が失われるのを防ぐ。
+        /// </summary>
+        private void OnSceneSaving(UnityEngine.SceneManagement.Scene scene, string path)
+        {
+            if (scene != gameObject.scene) return;
+
+            RestoreOriginalFloorMaterials();
+        }
+
+        /// <summary>
+        /// シーン保存直後に床Rendererへ影マテリアルを再割り当てし、プレビュー表示を継続する。
+        /// </summary>
+        private void OnSceneSaved(UnityEngine.SceneManagement.Scene scene)
+        {
+            if (scene != gameObject.scene) return;
+
+            // RestoreOriginalFloorMaterialsでdirtyフラグが立っているため即時再割り当てされる
+            AssignFloorMaterial();
+        }
+
+        /// <summary>
+        /// Prefab編集モードでの保存直前に床Rendererを元のマテリアルへ復元する。
+        /// このManagerが保存対象のPrefabステージ内にいる場合のみ処理する。
+        /// </summary>
+        private void OnPrefabSaving(GameObject prefabRoot)
+        {
+            if (prefabRoot == null || prefabRoot.scene != gameObject.scene) return;
+
+            RestoreOriginalFloorMaterials();
+        }
+
+        /// <summary>
+        /// Prefab編集モードでの保存直後に影マテリアルを再割り当てする。
+        /// </summary>
+        private void OnPrefabSaved(GameObject prefabRoot)
+        {
+            if (prefabRoot == null || prefabRoot.scene != gameObject.scene) return;
+
+            AssignFloorMaterial();
+        }
+#endif
 
         private void OnValidate()
         {

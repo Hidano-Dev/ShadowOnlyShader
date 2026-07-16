@@ -5,6 +5,20 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [0.9.0] - 2026-07-16
+
+### 追加
+
+- Edit モードでの影プレビューに対応（`ShadowOnlyManager` / `VirtualLight` を `[ExecuteAlways]` 化）
+  - Play しなくても Scene / Game ビューで影が表示され、床面の白いデフォルトマテリアルも Edit モード中から透明な影マテリアルに置き換わる
+  - シーンファイルの汚染防止: 床 Renderer へ割り当てる自動生成マテリアル（`HideFlags.DontSave`）は、シーン保存・Prefab 編集モードでの保存の直前に退避しておいた元のマテリアルへ自動復元され、保存後に再割り当てされる。Manager の無効化・破棄時や `RemoveFloorRenderer` 時も同様に復元されるため、プレビューによって `.unity` / `.prefab` ファイルに差分が入らない
+  - `SourceLight` 同期は Play モード専用のまま（同期は Transform とシリアライズフィールドへ書き込むため、Edit モードで実行するとシーンに意図しない差分が入る）。Edit モードのプレビューは VirtualLight 自身の Transform / パラメータを反映する
+  - RendererFeature が Preview カメラ（マテリアル / Inspector プレビュー）と Reflection Probe カメラで影パスをスキップするようになった。特に Reflection Probe は従来 Resolve RT をプローブ解像度で上書きする問題があったため修正を兼ねる
+
+### 既知の制限
+
+- 床 Renderer が Prefab インスタンスの場合、Edit モード中に「Apply to Prefab」を実行すると自動生成マテリアルの Missing 参照が Prefab アセットに書き込まれる可能性があります。床のマテリアルを Prefab に Apply する際は一度 Manager を無効化してください
+
 ## [0.8.0] - 2026-07-10
 
 ### 追加

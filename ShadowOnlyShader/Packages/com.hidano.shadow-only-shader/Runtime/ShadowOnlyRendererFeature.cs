@@ -65,6 +65,15 @@ namespace ShadowOnlyShader
         {
             if (_renderPass == null) return;
 
+            // マテリアル/InspectorプレビューやReflection Probeのカメラでは影パスを実行しない。
+            // ManagerのExecuteAlways化によりEditモードでもパスが動作するため、
+            // プレビュー描画への不要な影響とGPU負荷を避ける
+            var cameraType = renderingData.cameraData.cameraType;
+            if (cameraType == CameraType.Preview || cameraType == CameraType.Reflection)
+            {
+                return;
+            }
+
             // シーン内のアクティブなShadowOnlyManagerを検索
             var manager = FindActiveManager();
 

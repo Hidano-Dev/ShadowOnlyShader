@@ -10,7 +10,11 @@ namespace ShadowOnlyShader
     /// 投影パラメータの管理、View/Projection/VP行列の計算を行う。
     /// IVirtualLightインターフェースを実装する。
     /// 深度テクスチャはShadowOnlyManagerがTexture2DArrayとして一元管理する。
+    /// ExecuteAlwaysによりEditモードでも行列が更新され、影のプレビューに使用される。
+    /// ただしSourceLight同期はTransformやシリアライズフィールドへ書き込むため、
+    /// シーンに意図しない差分が入らないようPlayモード専用とする。
     /// </summary>
+    [ExecuteAlways]
     public class VirtualLight : MonoBehaviour, IVirtualLight
     {
         /// <summary>
@@ -845,6 +849,11 @@ namespace ShadowOnlyShader
             _renderersDirty = true;
             CollectRenderers();
 
+            // 行列キャッシュを初期化する。EditモードではLateUpdateが
+            // エディタの更新タイミングでしか呼ばれないため、
+            // シーンロード直後の描画で未初期化の行列が使われるのを防ぐ
+            UpdateMatrices();
+
             // 親ManagerにVirtualLightリストの再収集を通知
             NotifyManagerRefresh();
         }
@@ -897,6 +906,17 @@ namespace ShadowOnlyShader
 
         private void LateUpdate()
         {
+#if UNITY_EDITOR
+            // Editモード（ExecuteAlways）ではSourceLight同期を行わない。
+            // 同期はTransformとシリアライズフィールドへ書き込むため、
+            // 影を確認しているだけでシーンに差分が入ってしまう。
+            // Editモードでは行列更新のみ行ってプレビューを描画する
+            if (!Application.isPlaying)
+            {
+                UpdateMatrices();
+                return;
+            }
+#endif
             bool isSyncing = _sourceLight != null;
 
             // OFF → ON 遷移: 現在の状態を保存

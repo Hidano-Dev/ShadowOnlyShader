@@ -442,6 +442,77 @@ namespace ShadowOnlyShader.Tests.Runtime
         }
 
         [Test]
+        public void Manager無効化時に床面Rendererの元マテリアルが復元される()
+        {
+            var original = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            try
+            {
+                _floorRenderer.sharedMaterial = original;
+                _manager.AddFloorRenderer(_floorRenderer);
+                _manager.AssignFloorMaterial();
+
+                Assert.AreNotEqual(original, _floorRenderer.sharedMaterial,
+                    "割り当て後は元マテリアルから自動生成マテリアルに置き換わっていること");
+
+                _manager.enabled = false;
+
+                Assert.AreEqual(original, _floorRenderer.sharedMaterial,
+                    "Manager無効化時に元マテリアルが復元されること");
+            }
+            finally
+            {
+                Object.DestroyImmediate(original);
+            }
+        }
+
+        [Test]
+        public void RemoveFloorRenderer時に元マテリアルが復元される()
+        {
+            var original = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            try
+            {
+                _floorRenderer.sharedMaterial = original;
+                _manager.AddFloorRenderer(_floorRenderer);
+                _manager.AssignFloorMaterial();
+
+                _manager.RemoveFloorRenderer(_floorRenderer);
+
+                Assert.AreEqual(original, _floorRenderer.sharedMaterial,
+                    "登録解除時に元マテリアルが復元されること");
+            }
+            finally
+            {
+                Object.DestroyImmediate(original);
+            }
+        }
+
+        [Test]
+        public void 手動で差し替えたマテリアルはManager無効化時に上書きされない()
+        {
+            var original = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            var manual = new Material(Shader.Find("Hidden/InternalErrorShader"));
+            try
+            {
+                _floorRenderer.sharedMaterial = original;
+                _manager.AddFloorRenderer(_floorRenderer);
+                _manager.AssignFloorMaterial();
+
+                // ユーザーが手動で別マテリアルに差し替えたと想定
+                _floorRenderer.sharedMaterial = manual;
+
+                _manager.enabled = false;
+
+                Assert.AreEqual(manual, _floorRenderer.sharedMaterial,
+                    "手動で差し替えたマテリアルは復元処理で上書きされないこと");
+            }
+            finally
+            {
+                Object.DestroyImmediate(original);
+                Object.DestroyImmediate(manual);
+            }
+        }
+
+        [Test]
         public void AssignFloorMaterial_nullRendererをスキップしてエラーにならない()
         {
             _manager.AddFloorRenderer(_floorRenderer);
