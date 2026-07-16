@@ -14,6 +14,7 @@
   - シーンファイルの汚染防止: 床 Renderer へ割り当てる自動生成マテリアル（`HideFlags.DontSave`）は、シーン保存・Prefab 編集モードでの保存の直前に退避しておいた元のマテリアルへ自動復元され、保存後に再割り当てされる。Manager の無効化・破棄時や `RemoveFloorRenderer` 時も同様に復元されるため、プレビューによって `.unity` / `.prefab` ファイルに差分が入らない
   - `SourceLight` を設定した VirtualLight も Edit モードでプレビュー表示される。Edit モード中は Light の Transform・タイプ・range・shadowStrength を非破壊で参照して影を描画し（`EffectiveXxx` アクセサ）、シリアライズ値への同期書き込みは従来どおり Play モード専用のためシーンに差分は入らない。Scene ビューの Gizmo も同じ実効値で描画される
   - RendererFeature が Preview カメラ（マテリアル / Inspector プレビュー）と Reflection Probe カメラで影パスをスキップするようになった。特に Reflection Probe は従来 Resolve RT をプローブ解像度で上書きする問題があったため修正を兼ねる
+  - Hierarchy の目玉マーク（Scene Visibility）に影が追従するようになった。目玉マークで非表示にしたキャスターは Scene ビューの影からも除外され、VirtualLight 自体を非表示にするとその光源の影が Scene ビューから消える。Scene Visibility は Scene ビュー専用の機能のため、Game ビューの影には影響しない
 
 ### 既知の制限
 

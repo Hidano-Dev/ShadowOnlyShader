@@ -128,8 +128,12 @@ namespace ShadowOnlyShader
         /// <param name="passData">データを格納するPassData</param>
         /// <param name="cameraViewMatrix">カメラのView行列</param>
         /// <param name="cameraProjectionMatrix">カメラのProjection行列</param>
+        /// <param name="isSceneViewCamera">Sceneビューカメラの描画かどうか。
+        /// trueの場合、Hierarchyの目玉マーク（Scene Visibility）で非表示にされた
+        /// キャスターを深度描画から除外する。Scene Visibilityはエディタ専用かつ
+        /// Sceneビューにしか作用しない機能のため、Gameビューの影には影響しない。</param>
         /// <returns>有効なライトが1つ以上あればtrue</returns>
-        private bool CollectPassData(PassData passData, Matrix4x4 cameraViewMatrix, Matrix4x4 cameraProjectionMatrix)
+        private bool CollectPassData(PassData passData, Matrix4x4 cameraViewMatrix, Matrix4x4 cameraProjectionMatrix, bool isSceneViewCamera)
         {
             passData.Clear();
             passData.depthOnlyMaterial = _depthOnlyMaterial;
@@ -168,15 +172,34 @@ namespace ShadowOnlyShader
 
                 // 有効なRendererのみをフィルタリングしてプールされたリストに追加
                 var validRenderers = passData.GetPooledRendererList();
+#if UNITY_EDITOR
+                // Sceneビュー描画時、VirtualLight自体が目玉マークで非表示なら
+                // キャスターを登録しない（スライスは空クリアされ影が消える）。
+                // スライス割り当て自体は維持するため、Gameビューや
+                // Managerのパラメータ転送とのスライス対応はずれない
+                bool hideAllCasters = isSceneViewCamera
+                    && UnityEditor.SceneVisibilityManager.instance.IsHidden(vl.gameObject);
+                if (casterRenderers != null && !hideAllCasters)
+#else
                 if (casterRenderers != null)
+#endif
                 {
                     for (int r = 0; r < casterRenderers.Count; r++)
                     {
                         var renderer = casterRenderers[r];
-                        if (renderer != null && renderer.gameObject.activeInHierarchy && renderer.enabled)
+                        if (renderer == null || !renderer.gameObject.activeInHierarchy || !renderer.enabled)
                         {
-                            validRenderers.Add(renderer);
+                            continue;
                         }
+#if UNITY_EDITOR
+                        // 目玉マークで非表示のキャスターはSceneビューの影からも除外する
+                        if (isSceneViewCamera
+                            && UnityEditor.SceneVisibilityManager.instance.IsHidden(renderer.gameObject))
+                        {
+                            continue;
+                        }
+#endif
+                        validRenderers.Add(renderer);
                     }
                 }
 
@@ -276,8 +299,9 @@ namespace ShadowOnlyShader
             }
 
             var camera = renderingData.cameraData.camera;
+            bool isSceneViewCamera = renderingData.cameraData.cameraType == CameraType.SceneView;
 
-            if (!CollectPassData(_legacyPassData, camera.worldToCameraMatrix, camera.projectionMatrix))
+            if (!CollectPassData(_legacyPassData, camera.worldToCameraMatrix, camera.projectionMatrix, isSceneViewCamera))
             {
                 return;
             }
@@ -329,7 +353,8 @@ namespace ShadowOnlyShader
             using (var builder = renderGraph.AddUnsafePass<PassData>(
                 "ShadowOnly Depth Pass", out var passData))
             {
-                if (!CollectPassData(passData, camera.worldToCameraMatrix, camera.projectionMatrix))
+                bool isSceneViewCamera = cameraData.cameraType == CameraType.SceneView;
+                if (!CollectPassData(passData, camera.worldToCameraMatrix, camera.projectionMatrix, isSceneViewCamera))
                 {
                     return;
                 }
