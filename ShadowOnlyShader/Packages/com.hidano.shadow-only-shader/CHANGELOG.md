@@ -5,7 +5,7 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
-## [未リリース]
+## [0.8.1] - 2026-08-01
 
 ### 修正
 
