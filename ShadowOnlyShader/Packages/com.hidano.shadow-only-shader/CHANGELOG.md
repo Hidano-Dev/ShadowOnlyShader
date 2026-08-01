@@ -5,6 +5,14 @@
 フォーマットは [Keep a Changelog](https://keepachangelog.com/ja/1.1.0/) に基づき、
 [セマンティック バージョニング](https://semver.org/lang/ja/) に準拠しています。
 
+## [未リリース]
+
+### 修正
+
+- アルファチャンネル付き RenderTexture へ出力した際（Unity Recorder での ProRes 4444 書き出し等）、影の部分でデスティネーションアルファが削れて映像に半透明の穴が開く問題を修正
+  - 影の表示パス（`Hidden/ShadowOnlyShader/Floor` の Display パスおよび `Hidden/ShadowOnlyShader/FloorDisplay`）のブレンド設定が、アルファチャンネルにも `SrcAlpha OneMinusSrcAlpha` を適用していたため、書き込まれるアルファが `srcA² + dstA×(1-srcA)` となり、不透明な背景（dstA=1）の上に影を描くと結果アルファが 1 未満に低下していた。画面表示ではアルファが参照されないため気づけず、アルファを保持する RenderTexture 出力でのみ、影の部分が背景ごと透けて見える症状になる
+  - アルファのブレンド係数を標準の over 合成 `One OneMinusSrcAlpha`（`dstA' = srcA + dstA×(1-srcA)`）に分離。不透明背景では影を描いてもアルファ 1 が維持され、透明背景（dstA=0）へのシャドウキャッチャー合成では影の濃さがそのままアルファとして書き込まれる
+
 ## [0.8.0] - 2026-07-16
 
 ### 追加

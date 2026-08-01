@@ -18,7 +18,11 @@ Shader "Hidden/ShadowOnlyShader/FloorDisplay"
         {
             Name "ShadowOnlyFloorDisplay"
 
-            Blend SrcAlpha OneMinusSrcAlpha
+            // アルファチャンネルは標準over合成（dstA' = srcA + dstA*(1-srcA)）で書き込む。
+            // Floor シェーダーの Display パスと同様、アルファにも SrcAlpha 係数を使うと
+            // アルファ付きRenderTexture 出力時に影部分のデスティネーションアルファが
+            // 削れてしまうため、係数を分離している。
+            Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
             ZWrite Off
             ZTest LEqual
 

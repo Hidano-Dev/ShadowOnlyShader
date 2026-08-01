@@ -25,8 +25,13 @@ Shader "Hidden/ShadowOnlyShader/Floor"
         {
             Name "ShadowOnlyFloor"
 
-            // 影以外の部分をalpha=0で透明に保つ
-            Blend SrcAlpha OneMinusSrcAlpha
+            // 影以外の部分をalpha=0で透明に保つ。
+            // アルファチャンネルは標準over合成（dstA' = srcA + dstA*(1-srcA)）で書き込む。
+            // RGB と同じ SrcAlpha OneMinusSrcAlpha をアルファにも適用すると
+            // dstA' = srcA² + dstA*(1-srcA) となり、アルファ付きRenderTexture へ
+            // 出力（ProRes 4444 等での書き出し）した際に影部分のアルファが削れて
+            // 背景ごと透過する穴が開いてしまう。
+            Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
             ZWrite Off
             ZTest LEqual
 
